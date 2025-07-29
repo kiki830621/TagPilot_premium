@@ -4,6 +4,11 @@
 # 更新: 2024-06-23                                                            #
 ###############################################################################
 
+# ROS 框架對應：
+# Risk (R): 基於 nrec_prob（流失機率）
+# Opportunity (O): 基於 ipt_mean（購買間隔時間）
+# Stability (S): 基於 cri（Customer Regularity Index）
+
 # ── 系統初始化 ──────────────────────────────────────────────────────────────
 source("config/packages.R")    # 載入套件管理
 source("config/config.R")      # 載入配置設定
@@ -78,7 +83,7 @@ source("modules/module_wo_b.R")       # 主要分析模組
 source("scripts/global_scripts/10_rshinyapp_components/login/login_module.R")  # 登入模組
 source("modules/module_upload.R")     # 上傳模組
 source("modules/module_dna.R")
-source("modules/module_dna_multi.R")        # DNA 分析模組
+source("modules/module_dna_multi_pro2.R")  # DNA 分析模組 Pro2 with ROS
 
 # ── reactive values -----------------------------------------------------------
 facets_rv   <- reactiveVal(NULL)  # 目前 LLM 產出的 10 個屬性 (字串向量)
@@ -199,7 +204,7 @@ main_app_ui <- bs4DashPage(
             width = 12,
             solidHeader = TRUE,
             elevation = 3,
-            dnaMultiModuleUI("dna_multi1")
+            dnaMultiPro2ModuleUI("dna_multi1")
           )
         )
       ),
@@ -391,8 +396,8 @@ server <- function(input, output, session) {
     }
   }, ignoreInit = TRUE)
 
-    # DNA 分析模組
-    dna_mod <- dnaMultiModuleServer("dna_multi1", con_global, user_info, upload_mod$dna_data)
+    # DNA 分析模組 Pro2 with ROS
+    dna_mod <- dnaMultiPro2ModuleServer("dna_multi1", con_global, user_info, upload_mod$dna_data)
 
   # 登入狀態輸出
   output$user_logged_in <- reactive({

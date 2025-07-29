@@ -1,0 +1,21 @@
+﻿編號,歸屬 Baseline,行銷腳本核心,主要觸點 / 渠道,主要 KPI
+R‑01,R,24 h 內客服致電關懷,Call Center / Line Call,通話後 7 日回購率
+R‑02,R,無風險試用券 (RFD),Email／APP Coupon,90 日續購率
+R‑03,R,交叉銷售／低門檻加購,Web Push / APP Push,加購件數
+R‑04,R,動態折扣 3‑7 %,站內彈窗／SMS,折扣兌現率
+O‑01,O,24 h 豪華組限時加價購,APP Push + Landing,24 h 轉換率
+O‑02,O,新品早鳥 95 折,Email／LINE OA,首發檔期銷售額
+O‑03,O,補貨提醒 + 一鍵下單,SMS／APP One‑Click,單次 AOV
+O‑04,O,組合包升級 10 % off,Web Banner,升級轉換率
+O‑05,O,直播秒殺邀請碼,Line 群發／IG DM,直播成交率
+O‑06,O,好友分享再折 5 %,APP Share,拉新數
+S‑H‑01,S‑High,VIP 禮 / 生日禮盒,實體包裹,NPS
+S‑H‑02,S‑High,VIP 社群 + 抢先購,APP Push／Email,90 日 CLV
+S‑H‑03,S‑High,深度訪談 + 專屬客服,Phone／Meet,CSAT
+S‑M‑01,S‑Median,月度電子報 + 熱銷榜,EDM,開信率
+S‑M‑02,S‑Median,季度滿額禮,APP Inbox,累計客單
+S‑M‑03,S‑Median,問卷 × 折扣碼,Web Survey,回收率
+S‑L‑01,S‑Low,週期跟蹤提醒,APP Push／SMS,購買頻率
+S‑L‑02,S‑Low,價格敏感快閃 85 折,Web Banner,促銷轉換率
+S‑L‑03,S‑Low,訂閱制試用邀請,EDM／Landing,訂閱開通率
+S‑L‑04,S‑Low,清庫存閃購一天,Retarget Ads,庫存周轉
