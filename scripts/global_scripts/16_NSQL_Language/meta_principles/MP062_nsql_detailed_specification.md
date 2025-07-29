@@ -1,1 +1,0 @@
-../../ai_martech/global_scripts/00_principles/principles/MP062_nsql_detailed_specification.md
