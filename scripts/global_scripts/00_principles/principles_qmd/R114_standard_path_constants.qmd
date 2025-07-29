@@ -1,0 +1,318 @@
+---
+id: "R114"
+title: "Standard Path Constants Rule"
+type: "rule"
+date_created: "2025-07-12"
+date_modified: "2025-07-12"
+author: "Claude"
+implements:
+  - "MP042": "Runnable First"
+  - "MP048": "Universal Initialization"
+derives_from:
+  - "T001": "Update Scripts Templates"
+relates_to:
+  - "R113": "Four-Part Update Script Structure"
+  - "MP031": "Initialization First"
+---
+
+# R114: Standard Path Constants Rule
+
+## Core Requirement
+
+**All scripts MUST use the standard path constants initialized by `autoinit()` instead of hardcoded relative or absolute paths.**
+
+## Standard Path Constants
+
+The following constants are automatically available after `autoinit()` execution:
+
+### Core Directory Structure
+
+```r
+# Base directories
+APP_DIR              # Project root directory (here::here())
+COMPANY_DIR          # Parent directory of project root
+GLOBAL_DIR           # scripts/global_scripts/
+GLOBAL_DATA_DIR      # scripts/global_scripts/global_data/
+GLOBAL_PARAMETER_DIR # scripts/global_scripts/global_data/parameters/
+
+# Application data directories
+APP_DATA_DIR         # data/app_data/
+APP_PARAMETER_DIR    # data/app_data/parameters/
+LOCAL_DATA_DIR       # data/local_data/
+
+# Configuration files
+CONFIG_PATH          # app_config.yaml (project root)
+```
+
+### Database Path Constants
+
+```r
+# Database file paths (loaded from db_paths.R)
+db_path_list         # Complete database path list
+raw_data             # Raw data database path
+processed_data       # Processed data database path
+app_data             # Application data database path
+staged_data          # Staged data database path  
+transformed_data     # Transformed data database path
+cleansed_data        # Cleansed data database path
+```
+
+## Compliance Examples
+
+### ✅ CORRECT Usage
+
+```r
+# Sourcing functions
+source(file.path(GLOBAL_DIR, "04_utils", "fn_my_function.R"))
+source(file.path(GLOBAL_DIR, "02_db_utils", "fn_dbConnect_from_list.R"))
+
+# Configuration access
+config <- yaml::read_yaml(CONFIG_PATH)
+params <- readRDS(file.path(APP_PARAMETER_DIR, "model_params.rds"))
+
+# Data file access
+input_data <- read.csv(file.path(APP_DATA_DIR, "customer_data.csv"))
+output_path <- file.path(LOCAL_DATA_DIR, "processed_results.csv")
+
+# Database connections
+dbConnect_from_list("raw_data")
+dbConnect_from_list("processed_data")
+```
+
+### ❌ INCORRECT Usage
+
+```r
+# Hardcoded relative paths
+source("../../../../global_scripts/04_utils/fn_my_function.R")
+source("../../../02_db_utils/fn_dbConnect_from_list.R")
+
+# Hardcoded absolute paths
+config <- yaml::read_yaml("/full/path/to/app_config.yaml")
+source("/Users/user/project/scripts/global_scripts/init.R")
+
+# Manual path construction
+config_path <- file.path(getwd(), "app_config.yaml")
+global_dir <- file.path(dirname(getwd()), "scripts", "global_scripts")
+```
+
+## Implementation Pattern
+
+### In Update Scripts
+```r
+# 1. INITIALIZE
+autoinit()  # This sets up all path constants
+
+# 2. MAIN
+# Use path constants for all file operations
+result <- process_data(
+  input_file = file.path(APP_DATA_DIR, "input.csv"),
+  config_file = CONFIG_PATH,
+  output_dir = LOCAL_DATA_DIR
+)
+
+# 3. TEST
+# Verify outputs using path constants
+output_file <- file.path(LOCAL_DATA_DIR, "result.csv")
+if (!file.exists(output_file)) {
+  stop("Output file not created: ", output_file)
+}
+
+# 4. DEINITIALIZE
+autodeinit()
+```
+
+### In Function Files
+```r
+# Function should accept explicit paths or use global constants
+process_customer_data <- function(input_path = NULL, 
+                                  output_dir = LOCAL_DATA_DIR) {
+  
+  # Use provided path or default to standard location
+  if (is.null(input_path)) {
+    input_path <- file.path(APP_DATA_DIR, "customer_data.csv")
+  }
+  
+  # Process data
+  data <- read.csv(input_path)
+  processed_data <- transform_data(data)
+  
+  # Save to output directory using path constant
+  output_file <- file.path(output_dir, "processed_customer_data.csv")
+  write.csv(processed_data, output_file, row.names = FALSE)
+  
+  return(output_file)
+}
+```
+
+### In Component Files
+```r
+# Shiny components can use path constants for data loading
+customerDataServer <- function(id, config = NULL) {
+  moduleServer(id, function(input, output, session) {
+    
+    # Load configuration using standard path
+    if (is.null(config)) {
+      config <- yaml::read_yaml(CONFIG_PATH)
+    }
+    
+    # Load data using standard paths
+    customer_data <- reactive({
+      data_file <- file.path(APP_DATA_DIR, "customers.csv")
+      if (file.exists(data_file)) {
+        read.csv(data_file)
+      } else {
+        NULL
+      }
+    })
+    
+    output$customer_table <- DT::renderDataTable({
+      customer_data()
+    })
+  })
+}
+```
+
+## Path Resolution Strategy
+
+### 1. Automatic Resolution
+- `autoinit()` uses `here::here()` to find project root
+- All paths are relative to project root
+- Platform-independent path construction
+
+### 2. Fallback Mechanism
+```r
+# If path constants are not available, provide fallback
+get_safe_path <- function(path_constant, fallback_path) {
+  if (exists(deparse(substitute(path_constant)))) {
+    return(path_constant)
+  } else {
+    warning("Path constant not available, using fallback: ", fallback_path)
+    return(fallback_path)
+  }
+}
+
+# Usage
+data_dir <- get_safe_path(APP_DATA_DIR, "data/app_data")
+```
+
+### 3. Validation
+```r
+# Validate that required paths exist
+validate_paths <- function() {
+  required_paths <- list(
+    APP_DIR = APP_DIR,
+    GLOBAL_DIR = GLOBAL_DIR,
+    APP_DATA_DIR = APP_DATA_DIR
+  )
+  
+  missing_paths <- c()
+  for (name in names(required_paths)) {
+    if (!dir.exists(required_paths[[name]])) {
+      missing_paths <- c(missing_paths, name)
+    }
+  }
+  
+  if (length(missing_paths) > 0) {
+    stop("Required directories not found: ", paste(missing_paths, collapse = ", "))
+  }
+}
+```
+
+## Benefits
+
+### 1. Platform Independence
+- Paths work on Windows, macOS, and Linux
+- No hardcoded path separators
+- Automatic handling of drive letters and mount points
+
+### 2. Project Portability
+- Projects work regardless of installation location
+- No absolute path dependencies
+- Easy deployment to different environments
+
+### 3. Maintenance Efficiency
+- Path structure changes require updates in one place only
+- Consistent path handling across entire codebase
+- Reduced debugging of path-related issues
+
+### 4. Team Collaboration
+- All developers use identical path structure
+- No environment-specific path configurations
+- Simplified onboarding for new team members
+
+### 5. Testing and CI/CD
+- Tests run consistently across different environments
+- Simplified continuous integration setup
+- No path-related deployment failures
+
+## Migration from Legacy Code
+
+### Step 1: Identify Hardcoded Paths
+```bash
+# Search for common hardcoded path patterns
+grep -r "scripts/global_scripts" --include="*.R" .
+grep -r "\.\./\.\./\.\." --include="*.R" .
+grep -r "getwd()" --include="*.R" .
+```
+
+### Step 2: Replace with Constants
+```r
+# Before
+source("../../../../global_scripts/04_utils/fn_helper.R")
+
+# After
+source(file.path(GLOBAL_DIR, "04_utils", "fn_helper.R"))
+```
+
+### Step 3: Test Migration
+```r
+# Validate that all paths resolve correctly
+test_path_migration <- function() {
+  # Test that all expected constants exist
+  required_constants <- c("APP_DIR", "GLOBAL_DIR", "APP_DATA_DIR", "CONFIG_PATH")
+  
+  for (const in required_constants) {
+    if (!exists(const)) {
+      stop("Missing path constant: ", const)
+    }
+  }
+  
+  message("All path constants available and validated")
+}
+```
+
+## Enforcement
+
+### Code Review Checklist
+- [ ] No hardcoded relative paths (../../..)
+- [ ] No hardcoded absolute paths (/full/path/to/file)
+- [ ] All file operations use path constants
+- [ ] Functions accept explicit paths when needed
+- [ ] Fallback mechanisms for missing constants
+
+### Automated Validation
+```r
+# Function to check script compliance
+check_path_compliance <- function(script_path) {
+  content <- readLines(script_path)
+  
+  # Check for hardcoded patterns
+  violations <- c()
+  
+  # Relative path violations
+  relative_violations <- grep("\\.\\./\\.\\./", content, value = TRUE)
+  if (length(relative_violations) > 0) {
+    violations <- c(violations, "Hardcoded relative paths found")
+  }
+  
+  # Configuration violations
+  config_violations <- grep('yaml::read_yaml\\("app_config\\.yaml"\\)', content, value = TRUE)
+  if (length(config_violations) > 0) {
+    violations <- c(violations, "Hardcoded config path found")
+  }
+  
+  return(violations)
+}
+```
+
+This rule ensures consistent, maintainable, and portable path handling across the entire AI MarTech codebase while supporting the principle-driven development approach.

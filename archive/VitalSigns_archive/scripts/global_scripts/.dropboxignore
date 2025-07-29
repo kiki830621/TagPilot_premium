@@ -1,0 +1,96 @@
+# ----
+# Automatically Generated .dropboxignore file at 2025年 7月19日 週六 02時24分26秒 CST
+# ----
+# R specific
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+*.rds
+*.RDS
+*.Rdata
+*.rda
+*.feather
+*.parquet
+*.csv
+*.xlsx
+*.xls
+*.tsv
+
+# Common data files 
+*.csv.gz
+*.tsv.gz
+*.json
+*.xml
+*.html
+*.htm
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.svg
+*.zip
+*.tar.gz
+
+# MacOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python (for Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+*.ipynb
+
+# Large data directories
+data/*
+!data/.gitkeep
+data_raw/*
+!data_raw/.gitkeep
+outputs/*
+!outputs/.gitkeep
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.bak
+*.swp
+
+# Environment files
+.env
+.Renviron
+.Rprofile
+renv/
+packrat/
+
+# IDE specific files
+.idea/
+.vscode/
+
+# Git-Dropbox integration
+.git.nosync/
+.dropbox.ignore
+
+# Dropbox conflict files
+*conflicted copy*
+*conflict*
+*複本*
+*(*'s conflicted copy*
+# ----

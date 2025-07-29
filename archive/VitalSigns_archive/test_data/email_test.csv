@@ -1,0 +1,11 @@
+customer_id,payment_time,lineitem_price
+john.doe@example.com,2023-01-01,100
+jane.smith@example.com,2023-01-02,150
+bob.wilson@example.com,2023-01-03,200
+john.doe@example.com,2023-01-15,120
+jane.smith@example.com,2023-01-16,180
+bob.wilson@example.com,2023-01-17,250
+john.doe@example.com,2023-02-01,90
+jane.smith@example.com,2023-02-02,160
+alice.johnson@example.com,2023-02-03,300
+alice.johnson@example.com,2023-02-20,350 

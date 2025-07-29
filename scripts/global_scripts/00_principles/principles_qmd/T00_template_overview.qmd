@@ -1,0 +1,209 @@
+---
+id: "T000"
+title: "Template System Overview"
+type: "template-overview"
+date_created: "2025-07-12"
+date_modified: "2025-07-12"
+author: "Claude"
+implements:
+  - "MP018": "Don't Repeat Yourself"
+  - "MP044": "Functor-Module Correspondence"
+  - "R113": "Four-Part Update Script Structure"
+relates_to:
+  - "MP042": "Runnable First"
+  - "R021": "One Function One File"
+  - "R067": "Functional Encapsulation"
+---
+
+# T00: Template System Overview
+
+## Core Purpose
+
+The Template System (T-series) provides **standardized, reusable code templates** that implement core architectural principles and ensure consistency across the AI MarTech codebase. Templates serve as executable documentation that transforms abstract principles into concrete, working code patterns.
+
+## Template Philosophy
+
+Templates bridge the gap between **principles** (what to do) and **implementation** (how to do it):
+
+```mermaid
+graph LR
+    A[Principles<br/>MP/P/R] --> B[Templates<br/>T Series]
+    B --> C[Implementations<br/>Actual Code]
+    
+    A -.-> A1["MP018: DRY<br/>R113: Four-Part<br/>MP044: Functor-Module"]
+    B -.-> B1["Update Scripts<br/>Components<br/>ETL Pipelines"]
+    C -.-> C1["amz_D03_00.R<br/>microCustomer.R<br/>ETL01_pipeline.R"]
+```
+
+## Template Categories
+
+### T01: Update Scripts Templates {#sec-update-scripts}
+**Purpose**: Standardize update script structure following R113  
+**Key Features**:
+- Four-part structure (INITIALIZE → MAIN → TEST → DEINITIALIZE)
+- Error handling and resource management
+- Automated generation tools
+
+**Templates**:
+- `R113_update_script_template.R`: Base template
+- `fn_create_update_script.R`: Generation utility
+
+### T02: Component Structure Templates {#sec-components}
+**Purpose**: Implement UI-Server-Defaults pattern for Shiny components  
+**Key Features**:
+- Modular component architecture
+- Consistent naming conventions
+- Reactive programming patterns
+
+**Templates**:
+- Component folder structure
+- UI/Server/Defaults triple pattern
+- Namespace collision resolution
+
+### T03: ETL Pipeline Templates {#sec-etl-pipelines}
+**Purpose**: Standardize data pipeline implementation  
+**Key Features**:
+- Six-layer pipeline architecture
+- Configuration-driven processing
+- Error handling and monitoring
+
+**Templates**:
+- ETL configuration structure
+- Layer-specific processing functions
+- Pipeline orchestration patterns
+
+## Template Design Principles
+
+### 1. Principle-Driven
+Every template **directly implements** one or more documented principles:
+- Templates are not arbitrary patterns
+- Each template explicitly references its implementing principles
+- Principle changes automatically invalidate related templates
+
+### 2. Executable Documentation
+Templates serve as **working examples** of correct implementation:
+- Templates are runnable code, not just comments
+- They demonstrate best practices in action
+- They provide starting points for new implementations
+
+### 3. Parameterized and Flexible
+Templates support **customization without breaking principles**:
+- Configurable parameters for different use cases
+- Extension points for domain-specific logic
+- Preservation of core architectural requirements
+
+### 4. Tool-Supported
+Templates come with **automation tools** to reduce friction:
+- Automated generation utilities
+- Interactive creation workflows
+- Validation and compliance checking
+
+## Template Usage Patterns
+
+### Pattern 1: Copy-and-Customize
+```r
+# Copy template file
+file.copy("global_scripts/00_principles/principles/R113_update_script_template.R",
+          "update_scripts/new_script.R")
+
+# Customize placeholders
+# Replace [SCRIPT_NAME], [DESCRIPTION], etc.
+```
+
+### Pattern 2: Automated Generation
+```r
+# Load template generator
+source("global_scripts/04_utils/fn_create_update_script.R")
+
+# Generate customized template
+create_update_script(
+  script_name = "new_process",
+  description = "Process customer data",
+  derivation_id = "D05_00"
+)
+```
+
+### Pattern 3: Interactive Creation
+```r
+# Interactive template creation
+create_update_script_interactive()
+# Prompts for all required parameters
+```
+
+## Template Maintenance Strategy
+
+### 1. Principle Synchronization
+- When principles change, related templates **must** be updated
+- Template change log tracks principle dependencies
+- Automated validation checks principle compliance
+
+### 2. Version Management
+- Templates follow semantic versioning
+- Backward compatibility considerations
+- Migration guides for template updates
+
+### 3. Usage Tracking
+- Monitor which templates are most/least used
+- Identify gaps in template coverage
+- Collect feedback on template effectiveness
+
+## Integration with Development Workflow
+
+### Development Phase Integration
+```mermaid
+graph TD
+    A[Requirements] --> B[Select Template]
+    B --> C[Generate/Customize]
+    C --> D[Implement Logic]
+    D --> E[Test & Validate]
+    E --> F[Deploy]
+    
+    B -.-> B1["T01: Update Scripts<br/>T02: Components<br/>T03: ETL Pipelines"]
+    C -.-> C1["Automated tools<br/>Manual customization<br/>Interactive wizards"]
+    E -.-> E1["Principle compliance<br/>Code quality checks<br/>Integration testing"]
+```
+
+### Quality Assurance
+- Templates undergo rigorous testing
+- Principle compliance verification
+- Performance and maintainability review
+
+## Benefits of Template System
+
+### For Developers
+- **Faster development**: Skip boilerplate setup
+- **Reduced errors**: Follow proven patterns
+- **Consistent quality**: Built-in best practices
+- **Learning tool**: Understand architecture through examples
+
+### For Architecture
+- **Principle enforcement**: Automatic compliance with standards
+- **Pattern consistency**: Uniform implementation across codebase
+- **Change management**: Centralized control of architectural patterns
+- **Documentation**: Living examples of correct implementation
+
+### For AI Collaboration
+- **Structured understanding**: Clear patterns for AI to recognize
+- **Predictable generation**: AI can create compliant code using templates
+- **Context preservation**: Templates maintain architectural context
+- **Quality assurance**: Reduced need for manual review of generated code
+
+## Future Template Development
+
+### Planned Templates
+- **T04: API Endpoint Templates**: Standardize REST API patterns
+- **T05: Database Migration Templates**: Schema change management
+- **T06: Testing Templates**: Unit and integration test patterns
+- **T07: Documentation Templates**: Consistent documentation structure
+
+### Template Evolution
+- Monitor usage patterns and pain points
+- Collect developer feedback on template effectiveness
+- Expand template coverage to new architectural patterns
+- Enhance automation and generation capabilities
+
+## Conclusion
+
+The Template System transforms abstract principles into concrete, reusable code patterns that accelerate development while ensuring architectural consistency. By providing both manual templates and automated generation tools, the system supports developers at all skill levels while maintaining the high standards required for enterprise-grade applications.
+
+Templates serve as the crucial bridge between architectural vision and implementation reality, ensuring that the principles documented in this system are not just theoretical guidelines but practical tools that shape everyday development work.

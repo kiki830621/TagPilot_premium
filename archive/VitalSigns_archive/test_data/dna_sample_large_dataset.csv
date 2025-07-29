@@ -1,0 +1,65 @@
+customer_id,time,amount,product_name,category
+C001,2024-01-01 08:30:00,199.99,Wireless Headphones,Electronics
+C001,2024-01-15 14:20:00,299.99,Smartphone Case,Electronics
+C001,2024-02-05 10:45:00,89.99,Power Bank,Electronics
+C001,2024-03-10 16:30:00,459.99,Tablet,Electronics
+C002,2024-01-02 09:15:00,149.99,Running Shoes,Sports
+C002,2024-02-18 13:45:00,79.99,Gym Bag,Sports
+C002,2024-04-22 11:20:00,249.99,Fitness Tracker,Sports
+C003,2024-01-05 12:00:00,59.99,Face Cream,Beauty
+C003,2024-01-20 15:30:00,89.99,Makeup Kit,Beauty
+C003,2024-02-14 17:45:00,34.99,Lipstick,Beauty
+C003,2024-03-25 09:30:00,129.99,Skincare Set,Beauty
+C003,2024-05-10 14:15:00,79.99,Perfume,Beauty
+C004,2024-01-08 10:30:00,899.99,Coffee Machine,Home
+C004,2024-02-20 12:45:00,199.99,Blender,Home
+C004,2024-04-15 16:00:00,349.99,Air Fryer,Home
+C005,2024-01-10 11:45:00,1299.99,Gaming Laptop,Electronics
+C005,2024-03-05 14:30:00,199.99,Gaming Mouse,Electronics
+C005,2024-05-20 10:15:00,149.99,Mechanical Keyboard,Electronics
+C006,2024-01-12 13:20:00,49.99,Novel Book,Books
+C006,2024-02-08 15:45:00,29.99,Cookbook,Books
+C006,2024-03-18 09:30:00,39.99,Self-Help Book,Books
+C006,2024-04-28 12:15:00,59.99,Art Book,Books
+C006,2024-06-02 16:45:00,24.99,Magazine,Books
+C007,2024-01-15 08:45:00,599.99,Winter Coat,Clothing
+C007,2024-03-22 14:20:00,159.99,Jeans,Clothing
+C007,2024-05-08 11:30:00,89.99,T-Shirt Set,Clothing
+C008,2024-01-18 10:00:00,749.99,Mountain Bike,Sports
+C008,2024-02-25 13:15:00,129.99,Bike Helmet,Sports
+C008,2024-04-10 15:45:00,199.99,Cycling Gear,Sports
+C009,2024-01-20 12:30:00,299.99,Smart Watch,Electronics
+C009,2024-03-15 14:45:00,79.99,Watch Band,Electronics
+C009,2024-05-25 09:20:00,99.99,Wireless Charger,Electronics
+C010,2024-01-22 16:15:00,189.99,Garden Tools,Home
+C010,2024-04-05 11:45:00,249.99,Lawn Mower,Home
+C011,2024-01-25 09:30:00,159.99,Yoga Mat,Sports
+C011,2024-02-28 13:20:00,89.99,Water Bottle,Sports
+C011,2024-04-12 15:30:00,199.99,Protein Powder,Sports
+C011,2024-06-08 10:45:00,129.99,Resistance Bands,Sports
+C012,2024-01-28 14:00:00,449.99,Office Chair,Home
+C012,2024-03-20 16:30:00,299.99,Desk Lamp,Home
+C012,2024-05-15 12:15:00,199.99,Storage Box,Home
+C013,2024-02-01 11:20:00,79.99,Phone Charger,Electronics
+C013,2024-02-15 14:45:00,129.99,Bluetooth Speaker,Electronics
+C013,2024-04-08 10:30:00,199.99,Camera Lens,Electronics
+C013,2024-06-12 16:00:00,349.99,Action Camera,Electronics
+C014,2024-02-05 13:45:00,249.99,Kitchen Knife Set,Home
+C014,2024-04-18 15:20:00,159.99,Cutting Board,Home
+C015,2024-02-08 10:15:00,89.99,Hair Dryer,Beauty
+C015,2024-03-25 12:30:00,149.99,Hair Straightener,Beauty
+C015,2024-05-30 14:45:00,199.99,Beauty Mirror,Beauty
+C016,2024-02-10 09:45:00,599.99,Hiking Backpack,Sports
+C016,2024-04-25 11:30:00,299.99,Camping Tent,Sports
+C016,2024-06-15 13:45:00,189.99,Sleeping Bag,Sports
+C017,2024-02-12 15:30:00,1199.99,Designer Handbag,Luxury
+C017,2024-05-05 12:45:00,799.99,Luxury Watch,Luxury
+C018,2024-02-15 11:00:00,39.99,Phone Case,Electronics
+C018,2024-03-28 14:15:00,49.99,Screen Protector,Electronics
+C018,2024-05-22 16:30:00,29.99,Car Charger,Electronics
+C018,2024-06-20 10:45:00,79.99,Car Mount,Electronics
+C019,2024-02-18 13:30:00,299.99,Air Purifier,Home
+C019,2024-04-30 15:45:00,199.99,Humidifier,Home
+C020,2024-02-20 10:20:00,149.99,Board Game,Toys
+C020,2024-04-02 12:35:00,89.99,Puzzle,Toys
+C020,2024-06-08 14:50:00,199.99,Educational Toy,Toys 
