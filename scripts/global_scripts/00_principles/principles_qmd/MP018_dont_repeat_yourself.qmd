@@ -1,0 +1,281 @@
+---
+title: "MP018: Don't Repeat Yourself Principle"
+subtitle: "Eliminating Duplication for Maintainable Code"
+id: mp018
+type: meta-principle
+date_created: "2025-04-02"
+author: "Claude"
+derives_from: 
+  - mp000
+  - mp002
+influences:
+  - mp007
+  - p001
+  - p004
+  - p010
+applies_to:
+  - d01
+  - d02
+  - customer-data-processing
+format:
+  html:
+    toc: true
+    code-fold: show
+crossref:
+  fig-title: "Figure"
+  tbl-title: "Table"
+---
+
+# Don't Repeat Yourself (DRY) Principle {#sec-dry}
+
+::: {.callout-important}
+## Core Principle
+Every piece of knowledge, logic, or functionality should have a single, unambiguous, authoritative representation within the system.
+:::
+
+## Conceptual Framework {#sec-framework}
+
+The DRY principle establishes that each piece of knowledge or logic should have a single, authoritative representation within the system, eliminating duplication and enabling more maintainable, consistent, and evolvable code.
+
+### Knowledge Representation Types {#sec-knowledge-types}
+
+The DRY principle applies to all forms of knowledge representation:
+
+#### 1. Code Duplication
+- Functions and algorithms should not be duplicated
+- Business logic should be defined once, then reused
+- Utility operations should be centralized
+- Common patterns should be abstracted into reusable components
+
+#### 2. Data Duplication  
+- Data structures should be defined once
+- Constants and configuration values should have single sources
+- Lookup tables should be normalized
+- Reference data should be maintained in one location
+
+#### 3. Documentation Duplication
+- Each concept should be documented in one authoritative location
+- Cross-references should be used instead of duplication (see @mp007)
+- Derived documentation should be generated from source when possible
+
+## D-Series Duplication Problem {#sec-d-series-problem}
+
+### Current Issue
+
+Analysis of @d01 and @d02 reveals significant violations of the DRY principle:
+
+::: {.callout-warning}
+## Identified Duplications
+
+1. **Data Processing Steps**: Both D01 and D02 contain similar Import → Cleanse → Preprocess → Standardize workflows
+2. **Customer Profile Creation**: Identical customer aggregation logic appears in both derivations
+3. **Filter Application**: Similar filtering logic with slight variations
+4. **RFM Calculations**: Repeated recency, frequency, monetary calculations
+:::
+
+### Impact Analysis
+
+```{r}
+#| label: tbl-duplication-impact
+#| tbl-cap: "Impact of Code Duplication in D-Series"
+#| echo: false
+#| eval: true
+
+library(knitr)
+library(dplyr)
+
+duplication_impact <- tibble(
+  `Duplication Type` = c(
+    "Data Standardization", 
+    "Customer Aggregation", 
+    "Filter Logic", 
+    "RFM Calculations"
+  ),
+  `Lines Duplicated` = c(45, 32, 28, 56),
+  `Maintenance Risk` = c("High", "High", "Medium", "High"),
+  `Refactor Priority` = c("Immediate", "Immediate", "Soon", "Immediate")
+)
+
+kable(duplication_impact)
+```
+
+## Implementation Patterns {#sec-patterns}
+
+### Function Extraction Pattern
+
+```{r}
+#| label: function-extraction
+#| eval: false
+
+# BEFORE: Duplicated code in D01 and D02
+standardize_d01_data <- function(raw_data) {
+  raw_data %>%
+    rename(
+      lineproduct_price = product_price,
+      payment_time = time
+    ) %>% 
+    mutate(
+      customer_id = as.integer(as.factor(ship_postal_code))
+    ) %>%
+    drop_na(customer_id)
+}
+
+standardize_d02_data <- function(raw_data) {
+  # Nearly identical logic with minor variations
+  raw_data %>%
+    rename(
+      lineproduct_price = product_price, 
+      payment_time = time
+    ) %>% 
+    mutate(
+      customer_id = as.integer(as.factor(ship_postal_code))
+    ) %>%
+    drop_na(customer_id)
+}
+
+# AFTER: Single authoritative function (following @r067)
+#' Standardize sales data with consistent field mapping
+#' 
+#' @param raw_data Raw sales data frame
+#' @param platform_id Platform identifier for tracking
+#' @return Standardized data frame with consistent field names
+standardize_sales_data <- function(raw_data, platform_id) {
+  raw_data %>%
+    rename(
+      lineproduct_price = product_price,
+      payment_time = time
+    ) %>% 
+    mutate(
+      customer_id = as.integer(as.factor(ship_postal_code)),
+      platform_id = platform_id
+    ) %>%
+    drop_na(customer_id)
+}
+```
+
+### Configuration-Driven Abstraction
+
+```{r}
+#| label: config-driven
+#| eval: false
+
+# Configuration approach to handle variations
+processing_config <- list(
+  d01_dna_analysis = list(
+    include_product_line_filter = TRUE,
+    calculate_ipt = TRUE,
+    output_format = "dna_profile"
+  ),
+  d02_customer_filtering = list(
+    include_product_line_filter = TRUE,
+    calculate_ipt = FALSE,
+    output_format = "filtered_view"
+  )
+)
+
+# Single processing function with configuration
+process_customer_data <- function(data, config_name) {
+  config <- processing_config[[config_name]]
+  
+  # Common processing steps
+  standardized <- standardize_sales_data(data)
+  
+  # Conditional processing based on configuration
+  if (config$include_product_line_filter) {
+    standardized <- apply_product_line_filter(standardized)
+  }
+  
+  if (config$calculate_ipt) {
+    standardized <- calculate_ipt_metrics(standardized)
+  }
+  
+  return(format_output(standardized, config$output_format))
+}
+```
+
+## Recommended Refactoring {#sec-refactoring}
+
+### Step 1: Create Unified Processing Module
+
+Following @mp044 (Functor-Module Correspondence), create:
+
+```
+M48_processing_customer_data/
+├── process_customer_data.R      # Main implementation
+├── sc_process_customer_data.R   # Execution script  
+├── process_customer_data_utils.R # Utility functions
+└── README.md                    # Documentation
+```
+
+### Step 2: Extract Common Functions
+
+Following @r067 (Functional Encapsulation):
+
+```{r}
+#| label: extracted-functions
+#| eval: false
+
+# fn_standardize_sales_data.R
+source("global_scripts/04_utils/fn_standardize_sales_data.R")
+
+# fn_create_customer_profile.R  
+source("global_scripts/04_utils/fn_create_customer_profile.R")
+
+# fn_apply_filter_conditions.R
+source("global_scripts/04_utils/fn_apply_filter_conditions.R")
+
+# fn_calculate_rfm_metrics.R
+source("global_scripts/04_utils/fn_calculate_rfm_metrics.R")
+```
+
+### Step 3: Refactor D01 and D02
+
+```{r}
+#| label: refactored-d-series
+#| eval: false
+
+# D01: DNA Analysis becomes a configuration-driven workflow
+run_dna_analysis <- function(platform_data) {
+  process_customer_data(platform_data, "d01_dna_analysis")
+}
+
+# D02: Customer Filtering becomes another configuration
+run_customer_filtering <- function(platform_data) {
+  process_customer_data(platform_data, "d02_customer_filtering")
+}
+```
+
+## Benefits of DRY Implementation {#sec-benefits}
+
+1. **Reduced Maintenance Burden**: Changes need to be made in only one place
+2. **Improved Consistency**: Behavior is consistent across the system  
+3. **Enhanced Readability**: Code intent is clearer with less redundancy
+4. **Better Testability**: Centralized functionality is easier to test thoroughly
+5. **Easier Evolution**: Changes can be made more confidently
+
+## Relationship to Other Principles {#sec-relationships}
+
+This meta-principle:
+
+- **Derives from @mp000** (Axiomatization System): Establishes DRY as a foundational axiom
+- **Builds upon @mp002** (Structural Blueprint): Provides guidance for reducing duplication in system structure
+- **Influences @mp044** (Functor-Module Correspondence): Guides creation of reusable modules
+- **Implements through @r067** (Functional Encapsulation): Enables function extraction and reuse
+- **Supports @p004** (App Construction): Directs how components should be reused rather than duplicated
+
+## Next Steps {#sec-next-steps}
+
+1. Review @d01 and @d02 for specific duplication instances
+2. Apply @mp044 to create unified processing modules
+3. Use @r067 to extract shared functions
+4. Validate refactoring maintains functionality
+5. Update documentation to reflect new structure
+
+::: {.callout-tip}
+## Implementation Priority
+Start with the most duplicated functions: data standardization and customer aggregation logic, as these have the highest maintenance impact.
+:::
+
+---
+
+*For implementation details, see @r067 (Functional Encapsulation) and @mp044 (Functor-Module Correspondence).*

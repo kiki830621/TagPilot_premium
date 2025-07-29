@@ -1,0 +1,49 @@
+---
+id: "R149"
+title: "No Inline `source()` Inside Functions"
+author: "Project Guidelines"
+date: 2025-07-18
+category: "Coding Principles"
+---
+
+## R149 ‒ 函式內禁止 `source()` 其他檔案
+
+### 說明
+在函式本體（`function() { ... }`）中呼叫 `source()` 以載入其他 R 檔案，會產生以下問題：
+
+1. **可預期性下降**：函式的輸入與輸出不再單純，副作用難以追蹤。
+2. **效能低落**：多次呼叫函式時，重複 `source()` 造成 IO 與解析開銷。
+3. **測試困難**：單元測試無法輕易 mock 外部依賴，且路徑硬編碼易在 CI／不同工作目錄失效。
+4. **版本一致性風險**：執行期間若檔案被修改，行為可能不同，破壞可重現性。
+
+### 規範
+1. **初始化階段一次載入**  
+   由 `autoinit()`、`.Rprofile` 或套件化機制於程式啟動時統一 `source()`。  
+2. **動態需求應檢查存在性**  
+   如確需動態載入，應先 `if (!exists("foo")) source(...)`，並置於**函式外層**（同檔案最上方或初始化腳本）。  
+3. **推廣套件化**  
+   共用函式建議封裝成內部套件，改用 `library(myutils)` 取代手動 `source()`。
+
+### 違規範例
+```r
+my_fun <- function(x) {
+  source("scripts/utils/fn_helper.R")   # ❌ 違反 R149
+  helper(x)
+}
+```
+
+### 合規範例
+```r
+# ---- 檔案開頭（或 autoinit）----
+if (!exists("helper", mode = "function")) {
+  source("scripts/utils/fn_helper.R")    # ✅ 外部一次載入
+}
+
+my_fun <- function(x) {
+  helper(x)                                # 潔淨函式
+}
+```
+
+---
+
+> 按照 R149，開發者應確保所有 `source()` 呼叫皆位於初始化腳本或檔案最上層，而非函式內部。 

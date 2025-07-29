@@ -1,0 +1,358 @@
+---
+title: "MP044: Functor-Module Correspondence Principle"  
+subtitle: "Mapping Language Commands to Code Modules"
+id: mp044
+type: meta-principle
+date_created: "2025-04-07"
+author: "Claude"
+derives_from:
+  - mp016
+  - mp027
+influences:
+  - r042
+  - r006
+implements_for:
+  - d01
+  - d02
+  - customer-data-processing
+format:
+  html:
+    toc: true
+    code-fold: show
+---
+
+# Functor-Module Correspondence Principle {#sec-functor-module}
+
+::: {.callout-important}
+## Core Principle
+Command functors in domain-specific languages (verb-object pairs) should correspond directly to dedicated implementation modules with standardized naming patterns, creating a categorical morphism between language semantics and code structure.
+:::
+
+## Conceptual Framework {#sec-framework}
+
+This principle establishes a categorical relationship between command functors in domain-specific languages (particularly SNSQL) and the module structure of the codebase.
+
+### Commands as Functors {#sec-commands-functors}
+
+Each verb-object command pair represents a functor that maps objects from one domain to another while preserving structure:
+
+```mermaid
+graph LR
+    A[Raw Data Domain] -->|"process data"| B[Processed Data Domain]
+    C[Sales Domain] -->|"analyze customers"| D[Analytics Domain]  
+    E[Database Domain] -->|"summarize database"| F[Documentation Domain]
+```
+
+### Categorical Preservation
+
+The mapping from command functors to implementation modules preserves categorical relationships and composition properties.
+
+## Implementation Requirements {#sec-requirements}
+
+### Module Naming Convention
+
+Modules corresponding to command functors follow this pattern:
+
+```
+M{sequential_number}_{verb}ing_{object}
+```
+
+Where:
+- `{sequential_number}`: Two-digit sequential identifier (01, 02, ...)
+- `{verb}ing`: Gerund form of the command verb
+- `{object}`: Primary object the verb acts upon
+
+#### Examples {#sec-naming-examples}
+
+| Functor | Module Name |
+|---------|-------------|
+| `process data` | `M48_processing_customer_data` |
+| `summarize database` | `M01_summarizing_database` |
+| `analyze customers` | `M49_analyzing_customers` |
+
+: Functor to Module Mapping Examples {#tbl-functor-examples}
+
+### Standardized Module Structure {#sec-module-structure}
+
+```
+M{number}_{verb}ing_{object}/
+├── {verb}_{object}.R          # Main implementation  
+├── sc_{verb}_{object}.R       # Script for execution
+├── {verb}_{object}_utils.R    # Utility functions
+└── README.md                  # Module documentation
+```
+
+## Solving D-Series Duplication {#sec-d-series-solution}
+
+### Current Problem
+
+@d01 and @d02 both implement variations of "process customer data" without following the functor-module correspondence:
+
+::: {.callout-warning}
+## Missing Functor-Module Implementation
+
+The `process customer data` functor is implemented redundantly across:
+- D01: DNA Analysis derivation
+- D02: Customer View Filtering derivation
+
+This violates both @mp018 (DRY) and MP044 (Functor-Module Correspondence).
+:::
+
+### Proposed Solution: M48_processing_customer_data
+
+Create a dedicated module that implements the `process customer data` functor:
+
+```{r}
+#| label: module-structure
+#| eval: false
+
+# M48_processing_customer_data/process_customer_data.R
+#' Process customer data through standardized pipeline
+#' 
+#' Implements the 'process customer data' functor, mapping from raw sales
+#' data domain to processed customer data domain.
+#' 
+#' @param raw_data Raw sales data frame
+#' @param processing_config Configuration specifying processing variations
+#' @return Processed customer data frame
+#'
+process_customer_data <- function(raw_data, processing_config) {
+  # Functor implementation preserving categorical structure
+  
+  # Domain mapping: Raw -> Cleansed  
+  cleansed_data <- cleanse_raw_data(raw_data)
+  
+  # Domain mapping: Cleansed -> Standardized
+  standardized_data <- standardize_data(cleansed_data, processing_config)
+  
+  # Domain mapping: Standardized -> Customer-Aggregated
+  customer_data <- aggregate_to_customer_level(standardized_data, processing_config)
+  
+  # Apply domain-specific transformations
+  if (processing_config$analysis_type == "dna") {
+    return(apply_dna_transformations(customer_data))
+  } else if (processing_config$analysis_type == "filtering") {
+    return(apply_filtering_transformations(customer_data))
+  }
+  
+  return(customer_data)
+}
+```
+
+### Configuration-Driven Variations {#sec-config-variations}
+
+```{r}
+#| label: config-variations  
+#| eval: false
+
+# Processing configurations for different use cases
+processing_configs <- list(
+  
+  # D01: DNA Analysis configuration
+  dna_analysis = list(
+    analysis_type = "dna",
+    include_product_line_filter = TRUE,
+    calculate_ipt = TRUE,
+    calculate_rfm = TRUE,
+    output_schema = "dna_profile"
+  ),
+  
+  # D02: Customer Filtering configuration  
+  customer_filtering = list(
+    analysis_type = "filtering",
+    include_product_line_filter = TRUE,
+    calculate_ipt = FALSE,
+    calculate_rfm = FALSE,
+    output_schema = "filtered_customer_view"
+  ),
+  
+  # Future: Additional configurations
+  behavioral_analysis = list(
+    analysis_type = "behavior",
+    include_product_line_filter = FALSE,
+    calculate_ipt = TRUE,
+    calculate_rfm = TRUE,
+    output_schema = "behavior_profile"
+  )
+)
+```
+
+## Theoretical Foundation {#sec-theory}
+
+### Category Theory Perspective
+
+From a category theory perspective:
+
+1. **Categories**: Different domains (raw data, processed data, analytics) form categories
+2. **Objects**: Data structures within domains are objects in these categories  
+3. **Morphisms**: Transformations between objects within domains
+4. **Functors**: Maps between categories (e.g., raw data → processed data)
+5. **Natural Transformations**: Systematic variations of functors (configurations)
+
+```mermaid
+graph TB
+    subgraph "Raw Data Category"
+        RD1[Sales Records]
+        RD2[Transaction Data] 
+        RD3[Customer Info]
+    end
+    
+    subgraph "Processed Data Category"  
+        PD1[Customer Profiles]
+        PD2[DNA Profiles]
+        PD3[Filter Views]
+    end
+    
+    RD1 -->|process_customer_data| PD1
+    RD2 -->|process_customer_data| PD2  
+    RD3 -->|process_customer_data| PD3
+```
+
+### Composition Properties
+
+Functors support composition, enabling complex workflows:
+
+```{r}
+#| label: functor-composition
+#| eval: false
+
+# Functor composition: raw_data -> customer_data -> analytics
+customer_analytics <- function(raw_data) {
+  # F1: Raw Data -> Customer Data
+  customer_data <- process_customer_data(raw_data, processing_configs$dna_analysis)
+  
+  # F2: Customer Data -> Analytics  
+  analytics <- analyze_customer_behavior(customer_data)
+  
+  return(analytics)
+}
+
+# This represents the composition F2 ∘ F1
+```
+
+## Implementation Example {#sec-implementation}
+
+### Step 1: Create Module Structure
+
+```bash
+mkdir -p M48_processing_customer_data
+cd M48_processing_customer_data
+```
+
+### Step 2: Implement Main Function
+
+```{r}
+#| label: main-implementation
+#| eval: false
+#| file: M48_processing_customer_data/process_customer_data.R
+
+# Main functor implementation
+source("process_customer_data_utils.R")
+
+process_customer_data <- function(raw_data, config_name) {
+  config <- processing_configs[[config_name]]
+  
+  # Validate inputs (category-theoretic domain checking)
+  validate_raw_data_domain(raw_data)
+  
+  # Apply functor mapping
+  result <- raw_data %>%
+    cleanse_raw_data() %>%
+    standardize_data(config) %>%
+    aggregate_to_customer_level(config) %>%
+    apply_domain_specific_transformations(config)
+  
+  # Validate outputs (ensure we're in target category)
+  validate_processed_data_domain(result, config)
+  
+  return(result)
+}
+```
+
+### Step 3: Create Execution Script  
+
+```{r}
+#| label: execution-script
+#| eval: false
+#| file: M48_processing_customer_data/sc_process_customer_data.R
+
+# Execution script for direct invocation
+source("process_customer_data.R")
+
+# Example: Process Amazon data for DNA analysis
+amazon_raw_data <- load_amazon_data()
+amazon_dna_data <- process_customer_data(amazon_raw_data, "dna_analysis")
+
+# Example: Process Amazon data for customer filtering  
+amazon_filter_data <- process_customer_data(amazon_raw_data, "customer_filtering")
+```
+
+## Benefits {#sec-benefits}
+
+1. **Mathematical Foundation**: Grounds code organization in category theory
+2. **Composition**: Facilitates composition of operations through functor composition  
+3. **Abstraction**: Provides higher-level abstractions for complex operations
+4. **Formal Reasoning**: Enables formal reasoning about code behavior
+5. **Extensibility**: Creates clear patterns for adding new functors
+6. **Maintenance**: Makes relationships between components explicit
+
+## Integration with Other Principles {#sec-integration}
+
+This principle works synergistically with:
+
+- **@mp018 (DRY)**: Eliminates duplication by creating single authoritative functors
+- **@r067 (Functional Encapsulation)**: Provides the mechanism for extracting functor implementations
+- **@r021 (One Function One File)**: Organizes functor implementations into proper file structure
+
+## Refactoring D01 and D02 {#sec-refactoring}
+
+### Before: Duplicated Implementation
+
+```{r}
+#| label: before-refactor
+#| eval: false
+
+# D01: DNA Analysis (contains full processing pipeline)
+d01_process <- function(raw_data) {
+  # 150+ lines of processing logic
+}
+
+# D02: Customer Filtering (duplicates much of the same logic)  
+d02_process <- function(raw_data) {
+  # 120+ lines of overlapping processing logic
+}
+```
+
+### After: Functor-Module Implementation
+
+```{r}
+#| label: after-refactor
+#| eval: false
+
+# D01: Uses the functor module
+run_dna_analysis <- function(raw_data) {
+  process_customer_data(raw_data, "dna_analysis")
+}
+
+# D02: Uses the same functor module with different configuration
+run_customer_filtering <- function(raw_data) {
+  process_customer_data(raw_data, "customer_filtering")  
+}
+```
+
+## Next Steps {#sec-next-steps}
+
+1. **Create M48_processing_customer_data module** following the standardized structure
+2. **Extract common logic** from @d01 and @d02 into the functor implementation
+3. **Define configuration variations** for different processing needs
+4. **Refactor D01 and D02** to use the new functor module
+5. **Test composition properties** to ensure categorical structure is preserved
+
+::: {.callout-tip}
+## Implementation Priority
+Begin with the most commonly used data processing patterns, as these will provide the highest return on investment for the refactoring effort.
+:::
+
+---
+
+*For related implementation guidance, see @mp018 (Don't Repeat Yourself) and @r067 (Functional Encapsulation).*

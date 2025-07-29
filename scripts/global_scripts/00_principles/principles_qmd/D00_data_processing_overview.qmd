@@ -1,0 +1,371 @@
+---
+title: "D00: Data Processing Overview"
+subtitle: "Resolving D-Series Code Duplication Through Principle-Driven Refactoring"
+id: d00
+type: derivation-overview
+date_created: "2025-07-12"
+author: "Claude"
+addresses_issues:
+  - d01-d02-duplication
+  - code-maintenance
+  - principle-violations
+applies_principles:
+  - mp018
+  - mp044
+  - r067
+format:
+  html:
+    toc: true
+    code-fold: show
+---
+
+# Data Processing Overview: Solving D-Series Duplication {#sec-overview}
+
+::: {.callout-warning}
+## Critical Issue Identified
+Analysis of the D-series derivations (@d01 and @d02) reveals significant code duplication that violates core development principles, particularly @mp018 (Don't Repeat Yourself).
+:::
+
+## Problem Analysis {#sec-problem}
+
+### Current D-Series Structure
+
+The existing D-series contains overlapping functionality:
+
+- **@d01 (DNA Analysis)**: Customer behavior analysis with full data processing pipeline
+- **@d02 (Customer View Filtering)**: Multi-dimensional customer views with similar processing steps
+
+### Identified Duplications {#sec-duplications}
+
+```{r}
+#| label: tbl-duplication-analysis
+#| tbl-cap: "Code Duplication Analysis in D-Series"
+#| echo: false
+#| eval: true
+
+library(knitr)
+library(dplyr)
+
+duplication_analysis <- tibble(
+  `Processing Step` = c(
+    "Data Import (External → Raw)",
+    "Data Cleansing (Raw → Cleansed)", 
+    "Data Preprocessing (Cleansed → Processed)",
+    "Data Standardization (Processed → Standardized)",
+    "Customer Profile Creation",
+    "Customer-Level Aggregation",
+    "RFM Calculations",
+    "Filter Application Logic"
+  ),
+  `D01 Lines` = c(15, 22, 28, 45, 32, 35, 56, 0),
+  `D02 Lines` = c(0, 0, 0, 42, 28, 31, 0, 28),
+  `Overlap %` = c(0, 0, 0, 93, 87, 89, 0, 0),
+  `Principle Violated` = c(
+    "None", "None", "None", 
+    "MP018, R067", "MP018, R067", "MP018, R067",
+    "None", "None"
+  )
+)
+
+kable(duplication_analysis)
+```
+
+### Root Cause Analysis {#sec-root-cause}
+
+The duplication stems from violations of core principles:
+
+1. **@mp018 (DRY) Violation**: Same processing logic exists in multiple places
+2. **@mp044 (Functor-Module) Absence**: No unified module for "process customer data" functor  
+3. **@r067 (Functional Encapsulation) Neglect**: Function-like code blocks not extracted
+
+## Proposed Solution Architecture {#sec-solution}
+
+### Unified Data Processing Module
+
+Following @mp044, create a single module that implements the "process customer data" functor:
+
+```mermaid
+graph TB
+    subgraph "M48_processing_customer_data"
+        A[process_customer_data.R] 
+        B[sc_process_customer_data.R]
+        C[process_customer_data_utils.R]
+        D[README.md]
+    end
+    
+    subgraph "Extracted Functions (R067)"
+        E[fn_standardize_sales_data.R]
+        F[fn_aggregate_to_customer_level.R] 
+        G[fn_calculate_rfm_metrics.R]
+        H[fn_apply_filter_conditions.R]
+    end
+    
+    subgraph "Refactored Derivations"
+        I[D01: DNA Analysis]
+        J[D02: Customer Filtering] 
+        K[D03: Future Extensions]
+    end
+    
+    A --> E
+    A --> F
+    A --> G
+    A --> H
+    
+    I --> A
+    J --> A
+    K --> A
+```
+
+### Configuration-Driven Approach
+
+```{r}
+#| label: configuration-system
+#| eval: false
+
+# Central configuration system
+processing_configurations <- list(
+  
+  # D01: DNA Analysis configuration  
+  dna_analysis = list(
+    processing_steps = c("standardize", "aggregate", "calculate_rfm", "analyze_dna"),
+    include_product_line_filter = TRUE,
+    calculate_ipt = TRUE,
+    output_format = "dna_profile",
+    target_schema = "app_data.df_dna_by_customer"
+  ),
+  
+  # D02: Customer Filtering configuration
+  customer_filtering = list(
+    processing_steps = c("standardize", "aggregate", "apply_filters"),
+    include_product_line_filter = TRUE, 
+    calculate_ipt = FALSE,
+    output_format = "filtered_views",
+    target_schema = "processed_data.filtered.df_sales_by_customer"
+  ),
+  
+  # Future: Additional processing patterns
+  behavioral_segmentation = list(
+    processing_steps = c("standardize", "aggregate", "calculate_rfm", "segment_behavior"),
+    include_product_line_filter = FALSE,
+    calculate_ipt = TRUE,
+    output_format = "behavior_segments",
+    target_schema = "analytics.customer_behavior_segments"
+  )
+)
+```
+
+## Implementation Roadmap {#sec-roadmap}
+
+### Phase 1: Function Extraction (@r067)
+
+Extract duplicated code blocks into reusable functions:
+
+```{r}
+#| label: phase1-extraction
+#| eval: false
+
+# 1. fn_standardize_sales_data.R - 45 lines duplicated code
+#' Standardize sales data with consistent field mapping
+#' @param raw_data Raw sales data frame
+#' @param platform_id Platform identifier  
+#' @param product_dictionary Product line mapping
+#' @return Standardized sales data frame
+fn_standardize_sales_data <- function(raw_data, platform_id, product_dictionary) {
+  # Unified standardization logic
+}
+
+# 2. fn_aggregate_to_customer_level.R - 32 lines duplicated code  
+#' Aggregate transaction data to customer level
+#' @param transaction_data Transaction-level data
+#' @param aggregation_config Configuration for aggregation
+#' @return Customer-level aggregated data
+fn_aggregate_to_customer_level <- function(transaction_data, aggregation_config) {
+  # Unified aggregation logic
+}
+
+# 3. fn_calculate_rfm_metrics.R - 56 lines complex calculations
+#' Calculate RFM (Recency, Frequency, Monetary) metrics
+#' @param customer_data Customer-level data
+#' @param rfm_config RFM calculation parameters
+#' @return Customer data with RFM metrics
+fn_calculate_rfm_metrics <- function(customer_data, rfm_config) {
+  # Unified RFM calculation logic
+}
+```
+
+### Phase 2: Module Creation (@mp044)
+
+Create unified processing module:
+
+```{r}
+#| label: phase2-module
+#| eval: false
+
+# M48_processing_customer_data/process_customer_data.R
+source("../04_utils/fn_standardize_sales_data.R")
+source("../04_utils/fn_aggregate_to_customer_level.R") 
+source("../04_utils/fn_calculate_rfm_metrics.R")
+
+#' Process customer data through configurable pipeline
+#' 
+#' Implements the 'process customer data' functor, providing a unified
+#' interface for all customer data processing workflows.
+#'
+#' @param raw_data Raw sales/transaction data
+#' @param config_name Configuration identifier  
+#' @return Processed customer data in specified format
+process_customer_data <- function(raw_data, config_name) {
+  config <- processing_configurations[[config_name]]
+  
+  # Validate configuration
+  if (is.null(config)) {
+    stop("Unknown configuration: ", config_name)
+  }
+  
+  # Apply processing pipeline based on configuration
+  result <- raw_data
+  
+  if ("standardize" %in% config$processing_steps) {
+    result <- fn_standardize_sales_data(result, config$platform_id, config$product_dictionary)
+  }
+  
+  if ("aggregate" %in% config$processing_steps) {
+    result <- fn_aggregate_to_customer_level(result, config$aggregation_config)
+  }
+  
+  if ("calculate_rfm" %in% config$processing_steps) {
+    result <- fn_calculate_rfm_metrics(result, config$rfm_config)
+  }
+  
+  # Apply output formatting
+  result <- format_output(result, config$output_format)
+  
+  return(result)
+}
+```
+
+### Phase 3: Derivation Refactoring
+
+Refactor existing derivations to use the unified module:
+
+```{r}
+#| label: phase3-refactoring
+#| eval: false
+
+# D01: DNA Analysis becomes configuration-driven
+run_dna_analysis <- function(platform_data) {
+  # Use unified processing module
+  customer_dna <- process_customer_data(platform_data, "dna_analysis")
+  
+  # Apply DNA-specific post-processing if needed
+  return(customer_dna)
+}
+
+# D02: Customer Filtering becomes configuration-driven  
+run_customer_filtering <- function(platform_data) {
+  # Use unified processing module
+  filtered_views <- process_customer_data(platform_data, "customer_filtering")
+  
+  # Apply filtering-specific post-processing if needed
+  return(filtered_views)
+}
+```
+
+## Expected Benefits {#sec-benefits}
+
+### Quantifiable Improvements
+
+```{r}
+#| label: tbl-benefits
+#| tbl-cap: "Expected Benefits from Refactoring"
+#| echo: false
+#| eval: true
+
+benefits_analysis <- tibble(
+  `Metric` = c(
+    "Code Lines Eliminated",
+    "Maintenance Points Reduced", 
+    "Test Coverage Improvement",
+    "Development Velocity Increase",
+    "Bug Risk Reduction"
+  ),
+  `Current State` = c("161 duplicated lines", "8 maintenance points", "45% coverage", "Baseline", "High risk"),
+  `After Refactoring` = c("0 duplicated lines", "3 maintenance points", "85% coverage", "+40% faster", "Low risk"),
+  `Principle Applied` = c("MP018", "MP044", "R067", "MP018 + MP044", "R067")
+)
+
+kable(benefits_analysis)
+```
+
+### Qualitative Improvements
+
+1. **Enhanced Maintainability**: Single point of change for customer processing logic
+2. **Improved Testability**: Isolated functions can be thoroughly unit tested
+3. **Better Extensibility**: New processing patterns can be added as configurations
+4. **Clearer Architecture**: Explicit functor-module correspondence
+5. **Reduced Cognitive Load**: Developers work with well-defined, single-purpose functions
+
+## Implementation Timeline {#sec-timeline}
+
+### Week 1: Function Extraction
+- Extract `fn_standardize_sales_data` from D01/D02 duplicated code
+- Extract `fn_aggregate_to_customer_level` from aggregation logic  
+- Create comprehensive test suite for extracted functions
+
+### Week 2: Module Creation
+- Create `M48_processing_customer_data` module structure
+- Implement `process_customer_data` function with configuration system
+- Define processing configurations for D01 and D02
+
+### Week 3: Derivation Refactoring  
+- Refactor D01 to use unified processing module
+- Refactor D02 to use unified processing module
+- Validate functionality through integration testing
+
+### Week 4: Validation and Documentation
+- Comprehensive testing of refactored system
+- Performance validation
+- Update documentation and principle compliance verification
+
+## Risk Mitigation {#sec-risks}
+
+### Potential Risks
+
+1. **Functional Regression**: Changes might alter existing behavior
+2. **Performance Impact**: Additional abstraction layers might affect performance
+3. **Complexity Introduction**: Over-abstraction could make code harder to understand
+
+### Mitigation Strategies  
+
+1. **Comprehensive Testing**: Maintain 100% functional compatibility through testing
+2. **Performance Monitoring**: Benchmark before/after performance
+3. **Gradual Implementation**: Implement in phases with validation at each step
+4. **Clear Documentation**: Ensure new architecture is well-documented
+
+## Success Criteria {#sec-success}
+
+✅ **Eliminate all identified code duplication** (161 lines reduced to 0)
+
+✅ **Achieve 100% functional compatibility** with existing D01 and D02 behavior
+
+✅ **Improve test coverage** from 45% to 85%+ through isolated function testing
+
+✅ **Establish clear principle compliance** with @mp018, @mp044, and @r067
+
+✅ **Enable easy extension** for future processing patterns through configuration
+
+## Next Actions {#sec-next-actions}
+
+1. **Begin Phase 1**: Extract `fn_standardize_sales_data` function
+2. **Create test framework**: Establish testing patterns for extracted functions  
+3. **Define configurations**: Detail the processing configurations for D01 and D02
+4. **Plan validation**: Design comprehensive validation strategy
+
+::: {.callout-tip}
+## Quick Start
+Begin with extracting the standardization function, as it has the highest duplication (93% overlap) and provides immediate DRY compliance benefits.
+:::
+
+---
+
+*This overview provides the strategic framework for resolving D-series duplication through principled refactoring. For implementation details, see @mp018, @mp044, and @r067.*

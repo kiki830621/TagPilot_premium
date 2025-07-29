@@ -1,0 +1,300 @@
+---
+id: "T005"
+title: "ETL Initialization Template"
+type: "templates"
+date_created: "2025-07-12"
+date_modified: "2025-07-12"
+author: "Claude"
+derives_from:
+  - "ETL000": "ETL Framework"
+  - "T000": "Template Overview"
+implements:
+  - "ETL Function Loading Strategy"
+relates_to:
+  - "R045": "Initialization Imports Only"
+  - "MP048": "Universal Initialization"
+---
+
+# T05: ETL Initialization Template
+
+## Core Purpose
+
+Documents the standard practice for ETL scripts in `update_scripts/`: **ETL utility functions are automatically loaded during `autoinit()`**, eliminating the need for manual sourcing in individual ETL scripts.
+
+**⚠️ Important**: In `update_scripts/`, `autoinit()` already handles ETL function loading. Do NOT add manual `source()` statements for ETL functions.
+
+## ETL Function Loading Strategy
+
+### Universal Functions (all/)
+Functions that can be used by any platform ETL pipeline should be loaded during initialization.
+
+### Platform-Specific Functions
+Functions specific to a platform should be loaded only when that platform's ETL is running.
+
+### Phase-Specific Functions
+Functions for specific ETL phases should be loaded on-demand based on the ETL phase being executed.
+
+## Implementation Template
+
+### ETL Initialization Script Template
+
+Create in `22_initializations/`:
+
+```r
+# sc_etl_initialization.R - ETL Function Auto-Loading
+# Automatically sources ETL utility functions during autoinit()
+
+#' Load ETL Utility Functions
+#' 
+#' Automatically sources commonly used ETL utility functions
+#' Called during autoinit() process
+#'
+load_etl_functions <- function() {
+  
+  # Universal Import Functions (used by all platforms)
+  tryCatch({
+    source(file.path(GLOBAL_DIR, "05_etl_utils", "all", "import", "fn_import_product_profiles.R"))
+    message("Loaded: Universal product profiles import function")
+  }, error = function(e) {
+    warning("Failed to load universal import functions: ", e$message)
+  })
+  
+  # Common ETL Utilities (cross-platform)
+  common_functions <- c(
+    "convert_all_columns_to_utf8.R",
+    "fn_remove_illegal_utf8.R", 
+    "convert_list_columns.R",
+    "DNA_Function_dplyr.R"
+  )
+  
+  for (func_file in common_functions) {
+    tryCatch({
+      source(file.path(GLOBAL_DIR, "05_etl_utils", "common", func_file))
+    }, error = function(e) {
+      warning("Failed to load common function ", func_file, ": ", e$message)
+    })
+  }
+  
+  message("ETL utility functions loaded successfully")
+}
+
+# Platform-specific ETL function loading
+load_platform_etl_functions <- function(platform_id) {
+  
+  platform_functions <- switch(platform_id,
+    "amz" = c(
+      "fn_import_competitor_products.R",
+      "fn_import_comment_properties.R",
+      "fn_import_comment_property_ratings.R"
+    ),
+    "ofw" = c(
+      "fn_import_website_sales.R"
+    ),
+    "eby" = c(
+      "fn_import_ebay_listings.R"
+    ),
+    c() # default: no platform-specific functions
+  )
+  
+  if (length(platform_functions) > 0) {
+    for (func_file in platform_functions) {
+      tryCatch({
+        source(file.path(GLOBAL_DIR, "05_etl_utils", platform_id, func_file))
+        message("Loaded platform function: ", func_file)
+      }, error = function(e) {
+        warning("Failed to load platform function ", func_file, ": ", e$message)
+      })
+    }
+  }
+}
+
+# Auto-load universal functions during initialization
+if (!exists("etl_functions_loaded") || !etl_functions_loaded) {
+  load_etl_functions()
+  etl_functions_loaded <- TRUE
+}
+```
+
+### Modified autoinit() Integration
+
+Update `autoinit()` to include ETL function loading:
+
+```r
+# In 22_initializations/fn_autoinit.R
+autoinit <- function() {
+  
+  # Existing initialization logic...
+  
+  # Load ETL utility functions
+  source(file.path(GLOBAL_DIR, "22_initializations", "sc_etl_initialization.R"))
+  
+  # Existing initialization continues...
+}
+```
+
+## Correct ETL Script Template (update_scripts/)
+
+**✅ CORRECT**: ETL scripts in `update_scripts/` should NOT include manual source statements
+
+```r
+# amz_ETL03_0IM_00.R - Amazon product Profiles Import
+# ETL03 Phase 0 Import 00: Import product Properties from Google Sheets
+# Follows R113: Four-Part Update Script Structure
+
+# ==============================================================================
+# 1. INITIALIZE
+# ==============================================================================
+
+# Initialize script execution tracking
+script_success <- FALSE
+test_passed <- FALSE
+main_error <- NULL
+
+# Initialize using unified autoinit system
+# ✅ autoinit() already loads all required ETL functions automatically
+autoinit()
+
+# Establish database connections using initialized system
+dbConnect_from_list("raw_data")
+
+message("INITIALIZE: Amazon product profiles import script initialized")
+
+# ==============================================================================
+# 2. MAIN
+# ==============================================================================
+
+tryCatch({
+  message("MAIN: Starting Amazon product profiles import...")
+
+  # ✅ Use ETL functions directly (already loaded by autoinit)
+  import_product_profiles(
+    db_connection = raw_data,
+    product_line_df = df_product_line,
+    google_sheet_id = "16-k48xxFzSZm2p8j9SZf4V041fldcYnR8ectjsjuxZQ",
+    sheet_name_prefix = "product_profile"
+  )
+
+  script_success <- TRUE
+  message("MAIN: Amazon product profiles import completed successfully")
+
+}, error = function(e) {
+  main_error <<- e
+  script_success <<- FALSE
+  message("MAIN ERROR: ", e$message)
+})
+
+# ... rest of script follows R113 structure
+```
+
+## ❌ INCORRECT Examples
+
+**Don't do this in update_scripts:**
+
+```r
+# ❌ WRONG: Manual sourcing not needed
+source(file.path(GLOBAL_DIR, "05_etl_utils", "all", "import", "fn_import_product_profiles.R"))
+
+# ❌ WRONG: Platform-specific loading not needed  
+load_platform_etl_functions("amz")
+
+# ❌ WRONG: Any manual source statements
+source("path/to/etl/function.R")
+```
+
+**Why this is wrong:**
+- `autoinit()` already handles all ETL function loading
+- Manual sourcing creates redundancy and potential conflicts
+- Goes against the centralized initialization principle
+
+## Benefits of This Approach
+
+### 1. **Centralized Function Management**
+- All ETL function loading logic in one place
+- Easy to maintain and update
+- Consistent across all ETL scripts
+
+### 2. **Reduced Code Duplication**
+- No need to source functions in every ETL script
+- Universal functions loaded once during initialization
+- Platform-specific functions loaded on-demand
+
+### 3. **Error Handling**
+- Graceful handling of missing functions
+- Clear error messages for debugging
+- Non-blocking warnings for optional functions
+
+### 4. **Performance Optimization**
+- Functions loaded once during initialization
+- Faster ETL script execution
+- Reduced I/O operations
+
+### 5. **Development Efficiency**
+- Developers don't need to remember which functions to source
+- Automatic loading of commonly used functions
+- Easy to add new functions to the loading system
+
+## Configuration Options
+
+### Environment Variable Control
+
+```r
+# Control ETL function loading via environment variables
+ETL_LOAD_ALL_FUNCTIONS <- Sys.getenv("ETL_LOAD_ALL_FUNCTIONS", "TRUE")
+ETL_LOAD_PLATFORM_FUNCTIONS <- Sys.getenv("ETL_LOAD_PLATFORM_FUNCTIONS", "TRUE")
+
+if (ETL_LOAD_ALL_FUNCTIONS == "TRUE") {
+  load_etl_functions()
+}
+```
+
+### Conditional Loading
+
+```r
+# Load functions based on script context
+script_name <- commandArgs(trailingOnly = FALSE)[4]
+if (grepl("ETL", script_name)) {
+  load_etl_functions()
+  
+  # Extract platform ID from script name
+  platform_match <- regmatches(script_name, regexpr("^[a-z]+", basename(script_name)))
+  if (length(platform_match) > 0) {
+    load_platform_etl_functions(platform_match[1])
+  }
+}
+```
+
+## Migration Path
+
+### Step 1: Create ETL Initialization
+1. Create `sc_etl_initialization.R` in `22_initializations/`
+2. Implement `load_etl_functions()` and `load_platform_etl_functions()`
+3. Update `autoinit()` to include ETL function loading
+
+### Step 2: Update Existing ETL Scripts
+1. Remove manual `source()` statements from ETL scripts
+2. Add `load_platform_etl_functions()` calls where needed
+3. Test that functions are available during script execution
+
+### Step 3: Validate and Optimize
+1. Ensure all ETL scripts work with new initialization
+2. Optimize function loading for performance
+3. Add error handling and logging
+
+## Best Practices
+
+### 1. **Graceful Degradation**
+- Always use `tryCatch()` when sourcing functions
+- Provide meaningful warning messages
+- Don't stop execution for missing optional functions
+
+### 2. **Loading Order**
+- Load universal functions first
+- Load platform-specific functions second
+- Load phase-specific functions last
+
+### 3. **Documentation**
+- Document which functions are auto-loaded
+- Provide clear error messages
+- Maintain loading function registry
+
+This template ensures that ETL scripts are clean, maintainable, and follow the DRY principle while providing robust function loading capabilities.

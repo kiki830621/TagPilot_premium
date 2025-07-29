@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/kiki830621/ai_martech_global_scripts.git
+	branch = main
+	commit = 718047a05d5a80662b88b624d8442a8d76f81a39
+	parent = 119a98c510092730b64294d0b8b1267ae021a302
+	method = merge
+	cmdver = 0.4.9

@@ -1,0 +1,214 @@
+---
+id: "MP083"
+title: "Development Environment Setup and Working Directory Management"
+type: "meta-principle"
+date_created: "2025-07-15"
+date_modified: "2025-07-15"
+author: "Claude"
+derives_from:
+  - "MP048": "Universal Initialization"
+  - "R021": "One Function One File"
+implements:
+  - "MP083": "Development Environment Setup"
+relates_to:
+  - "autoinit": "Initialization System"
+  - "ETL": "Data Pipeline Architecture"
+---
+
+# MP083: Development Environment Setup and Working Directory Management
+
+## Core Principle
+
+**All development work in this codebase MUST be performed from the project root directory**. This is a fundamental requirement that ensures proper initialization, database connections, and script execution.
+
+## Critical Requirements
+
+### 1. Working Directory Mandate
+
+**ALWAYS change to project root before any operations:**
+
+```bash
+# REQUIRED: Change to project root directory first
+cd /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l3_enterprise/WISER
+
+# THEN execute scripts with full paths
+Rscript scripts/update_scripts/script_name.R
+```
+
+### 2. Why This is Critical
+
+- **`autoinit()` Function**: Only available when running from project root
+- **Database Connections**: Automatically configured through initialization system
+- **Relative Paths**: All scripts designed to work from project root
+- **Global Scripts**: Proper sourcing of shared functions requires root directory context
+
+### 3. Initialization Dependencies
+
+The `autoinit()` function provides:
+- Package loading and management
+- Database connection establishment
+- Global variable setup
+- Utility function sourcing
+- Environment configuration
+
+## Standard Development Workflow
+
+### ETL Pipeline Execution
+
+```bash
+# ETL04 - Competitor Analysis Pipeline
+cd /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l3_enterprise/WISER
+Rscript scripts/update_scripts/amz_ETL04_0IM.R    # Import phase
+Rscript scripts/update_scripts/amz_ETL04_1ST.R    # Staging phase  
+Rscript scripts/update_scripts/amz_ETL04_2TR.R    # Transform phase
+
+# ETL03 - product Profiles Pipeline
+Rscript scripts/update_scripts/amz_ETL03_0IM.R                      # Main product profiles
+Rscript scripts/update_scripts/amz_ETL03_0IM_review_properties.R    # Review properties
+Rscript scripts/update_scripts/amz_ETL03_0IM_product_reviews.R      # Product reviews
+Rscript scripts/update_scripts/amz_ETL03_1ST.R                      # Staging phase
+Rscript scripts/update_scripts/amz_ETL03_2TR.R                      # Transform phase
+```
+
+### Interactive Development
+
+```r
+# Set working directory first
+setwd("/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l3_enterprise/WISER")
+
+# Initialize environment
+source("scripts/global_scripts/00_principles/sc_initialization_update_mode.R")
+# OR
+autoinit()
+
+# Now ready for development
+```
+
+## Common Errors and Solutions
+
+### Error: "沒有這個函式 autoinit"
+
+**Problem**: Script executed from wrong directory
+**Solution**: Always change to project root directory first
+
+```bash
+# WRONG - executing from subdirectory
+cd /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l3_enterprise/WISER/scripts/update_scripts
+Rscript amz_ETL04_0IM.R  # ❌ FAILS
+
+# CORRECT - executing from project root
+cd /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l3_enterprise/WISER
+Rscript scripts/update_scripts/amz_ETL04_0IM.R  # ✅ SUCCESS
+```
+
+### Error: Database connection failures
+
+**Problem**: Database paths not resolved correctly
+**Solution**: Ensure `autoinit()` runs from project root to establish proper `db_path_list`
+
+### Error: Function not found
+
+**Problem**: Global scripts not sourced properly
+**Solution**: Proper initialization from project root loads all utility functions
+
+## Implementation Standards
+
+### 1. Script Headers
+
+All scripts should include initialization from project root context:
+
+```r
+# Script assumes execution from project root
+# Usage: Rscript scripts/update_scripts/script_name.R
+
+# Initialize environment
+autoinit()
+
+# Script logic here...
+```
+
+### 2. Path References
+
+Use relative paths from project root:
+
+```r
+# CORRECT - relative from project root
+source(file.path("scripts", "global_scripts", "04_utils", "utility_function.R"))
+
+# WRONG - absolute paths or relative from script location
+source("../global_scripts/04_utils/utility_function.R")
+```
+
+### 3. Database Connections
+
+Rely on `autoinit()` to establish database connections:
+
+```r
+# CORRECT - use initialized connections
+autoinit()
+raw_data <- dbConnectDuckdb(db_path_list$raw_data, read_only = FALSE)
+
+# WRONG - manual database path construction
+raw_data <- dbConnect(duckdb(), "data/local_data/raw_data.duckdb")
+```
+
+## Enforcement Mechanisms
+
+### 1. Script Validation
+
+All scripts should validate working directory:
+
+```r
+# Optional: Validate working directory
+if (!file.exists("app_config.yaml")) {
+  stop("Script must be run from project root directory")
+}
+```
+
+### 2. Documentation Requirements
+
+- All documentation must emphasize working directory requirements
+- README files should include working directory setup instructions
+- Error messages should guide users to correct working directory
+
+### 3. Development Guidelines
+
+- IDE workspace should be configured to open in project root
+- Terminal/console should default to project root
+- All examples in documentation should show execution from project root
+
+## Related Principles
+
+- **MP048**: Universal Initialization - ensures consistent environment setup
+- **R021**: One Function One File - proper function sourcing requires correct working directory
+- **ETL Architecture**: All ETL scripts depend on proper initialization
+
+## Compliance Checklist
+
+Before executing any script:
+- [ ] Changed to project root directory
+- [ ] Verified `app_config.yaml` exists in current directory
+- [ ] Confirmed `autoinit()` function is available
+- [ ] Database connections established properly
+- [ ] Global scripts sourced correctly
+
+**Remember**: This is not optional - it's a fundamental requirement for successful development in this codebase.
+
+## Error Prevention
+
+### Common Mistake Prevention
+
+1. **Always start with directory change**: Make it the first step in any development workflow
+2. **Use absolute paths for directory changes**: Avoid relative directory navigation
+3. **Verify environment after initialization**: Check that expected objects exist
+4. **Use consistent execution patterns**: Always follow the same workflow
+
+### Debugging Tips
+
+When encountering initialization issues:
+1. Check current working directory with `getwd()`
+2. Verify `app_config.yaml` exists with `file.exists("app_config.yaml")`
+3. Check if `autoinit()` function is available with `exists("autoinit")`
+4. Examine `db_path_list` to ensure database paths are configured
+
+This principle ensures consistent, reliable development environment across all team members and deployment scenarios.

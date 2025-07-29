@@ -1,0 +1,126 @@
+# Relationships between Principles
+# This file defines how principles relate to each other
+
+relationships:
+  # Database Related
+  R0092_universal_dbi_approach:
+    implements:
+      - MP0016_modularity
+      - MP0017_separation_of_concerns
+      - MP0052_unidirectional_data_flow
+    related_to:
+      - R0076_module_data_connection
+      - R0091_universal_data_access
+      - P0076_error_handling_patterns
+      - P0077_performance_optimization
+      
+  R0093_database_status_display:
+    extends: R0092_universal_dbi_approach
+    implements:
+      - MP0016_modularity
+      - MP0017_separation_of_concerns
+      - MP0019_documentation_first
+    related_to:
+      - R0092_universal_dbi_approach
+      - P0076_error_handling_patterns
+      - P0077_performance_optimization
+      
+  R0116_tbl2_enhanced_data_access:
+    extends: R0101_unified_tbl_data_access
+    implements:
+      - MP0016_modularity
+    related_to:
+      - R100_database_access_tbl_rule
+      - R0101_unified_tbl_data_access
+      
+  # UI Components
+  R0110_explicit_namespace_in_shiny:
+    implements:
+      - MP0017_separation_of_concerns
+    related_to:
+      - R0109_bs4dash_namespace_rule
+      - R0106_selectize_input_usage
+      
+  R0090_bs4dash_structure_adherence:
+    implements:
+      - MP0016_modularity
+    related_to:
+      - R0109_bs4dash_namespace_rule
+      - R0092_bs4dash_direct_navigation
+      
+  # Testing
+  R0074_shiny_test_data:
+    implements:
+      - P0113_dual_testing_approach
+    related_to:
+      - R0075_test_script_initialization
+      - R0114_standard_mock_database
+      
+  R0114_standard_mock_database:
+    implements:
+      - MP0016_modularity
+      - P0113_dual_testing_approach
+    related_to:
+      - R0074_shiny_test_data
+      - R0092_universal_dbi_approach
+      
+  # Configuration
+  R0004_app_yaml_configuration:
+    implements:
+      - MP0016_modularity
+      - MP0017_separation_of_concerns
+      - MP0018_dont_repeat_yourself
+    related_to:
+      - R0097_config_requirement
+      - R0058_global_parameter_organization
+      
+  # Functions and Modules
+  R0021_one_function_one_file:
+    implements:
+      - MP0016_modularity
+      - MP0017_separation_of_concerns
+    related_to:
+      - R0069_function_file_naming
+      - R0108_function_deployment_rule
+      
+  R0076_module_data_connection:
+    implements:
+      - MP0016_modularity
+    related_to:
+      - R0091_universal_data_access
+      - R0092_universal_dbi_approach
+      
+  # Error Handling
+  P0076_error_handling_patterns:
+    implements:
+      - MP0011_sensible_defaults
+    related_to:
+      - P0102_defensive_error_handling
+      - R0092_universal_dbi_approach
+      - R0093_database_status_display
+      
+  # Performance
+  P0077_performance_optimization:
+    implements:
+      - MP0030_vectorization_principle
+    related_to:
+      - P0106_performance_acceleration
+      - R0050_data_table_vectorization
+      - R0049_apply_over_loops
+      
+  # Documentation
+  MP0019_documentation_first:
+    related_to:
+      - P0010_documentation_update
+      - R0020_logic_document_creation
+      - R0094_roxygen2_function_examples_standard
+      
+  # Naming Conventions
+  P0005_naming_principles:
+    implements:
+      - MP0071_capitalization_convention
+    related_to:
+      - R0001_file_naming_convention
+      - R0051_lowercase_variable_naming
+      - R0069_function_file_naming
+      - R0120_filter_variable_naming 
