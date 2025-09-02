@@ -255,8 +255,8 @@ main_app_ui <- bs4DashPage(
               p(strong("公司: "), "祈鋒行銷科技有限公司", style = "margin-bottom: 1rem; font-size: 1.1rem;"),
               p(strong("聯絡資訊: "), 
                 tags$a(
-                  href = "mailto:yuhsiang@utaipei.edu.tw",
-                  "林郁翔",
+                  href = "mailto:partners@peakededges.com",
+                  "partners@peakededges.com",
                   style = "color: #007bff; text-decoration: none;"
                 ), 
                 style = "margin-bottom: 1rem; font-size: 1.1rem;"

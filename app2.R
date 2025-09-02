@@ -1,13 +1,13 @@
 ###############################################################################
-# TagPilot Premium 精準行銷平台 - 主應用程式                                          #
-# 版本: v18 (bs4Dash)                                                         #
+# TagPilot Premium2 精準行銷平台 - 主應用程式                                          #
+# 版本: v18 (bs4Dash) - Premium2 with T×V Grid Mapping                       #
 # 更新: 2024-06-23                                                            #
 ###############################################################################
 
-# ROS 框架對應：
-# Risk (R): 基於 nrec_prob（流失機率）
-# Opportunity (O): 基於 ipt_mean（購買間隔時間）
-# Stability (S): 基於 cri（Customer Regularity Index）
+# T×V Grid 映射框架：
+# Tempo (T): 基於 IPT (Inter-Purchase Time) 的復購頻率分類
+# Value (V): 基於 CLV (Customer Lifetime Value) 的價值分類
+# 透過 mapping.csv 將 T×V 組合映射到對應的靜態區隔客戶
 
 # ── 系統初始化 ──────────────────────────────────────────────────────────────
 source("config/packages.R")    # 載入套件管理
@@ -83,7 +83,7 @@ source("modules/module_wo_b.R")       # 主要分析模組
 source("scripts/global_scripts/10_rshinyapp_components/login/login_module.R")  # 登入模組
 source("modules/module_upload.R")     # 上傳模組
 source("modules/module_dna.R")
-source("modules/module_dna_multi_premium.R")  # DNA 分析模組 Premium with IPT T-Series Insight
+source("modules/module_dna_multi_premium2.R")  # DNA 分析模組 Premium2 with T×V Grid Mapping
 
 # ── reactive values -----------------------------------------------------------
 facets_rv   <- reactiveVal(NULL)  # 目前 LLM 產出的 10 個屬性 (字串向量)
@@ -105,13 +105,13 @@ regression_trigger <- reactiveVal(0)
 
 # ── 主要應用 UI (bs4Dash) ───────────────────────────────────────────────
 main_app_ui <- bs4DashPage(
-  title = "TagPilot Premium 精準行銷平台",
+  title = "TagPilot Premium2 精準行銷平台",
   fullscreen = TRUE,
 
   # 頁首
   header = bs4DashNavbar(
     title = bs4DashBrand(
-      title = "TagPilot Premium",
+      title = "TagPilot Premium2",
       color = "primary",
       image = "assets/icons/app_icon.png"
     ),
@@ -140,7 +140,7 @@ main_app_ui <- bs4DashPage(
     # 步驟指示器
     div(class = "step-indicator",
         div(class = "step-item", id = "step_1", "1. 上傳資料"),
-        div(class = "step-item", id = "step_2", "2. T-Series 客戶生命週期")
+        div(class = "step-item", id = "step_2", "2. T×V Grid 客戶網格映射")
     ),
 
     # 選單
@@ -153,7 +153,7 @@ main_app_ui <- bs4DashPage(
         icon = icon("upload")
       ),
       bs4SidebarMenuItem(
-        text = "T-Series 客戶生命週期分析",
+        text = "T×V Grid 客戶網格映射分析",
         tabName = "dna_analysis",
         icon = icon("dna")
       ),
@@ -199,12 +199,12 @@ main_app_ui <- bs4DashPage(
         tabName = "dna_analysis",
         fluidRow(
           bs4Card(
-            title = "步驟 2：TagPilot Premium - T-Series Insight 客戶生命週期分析",
+            title = "步驟 2：TagPilot Premium2 - T×V Grid Mapping 客戶網格映射分析",
             status = "success",
             width = 12,
             solidHeader = TRUE,
             elevation = 3,
-            dnaMultiPremiumModuleUI("dna_multi1")
+            dnaMultiPremium2ModuleUI("dna_multi1")
           )
         )
       ),
@@ -221,13 +221,13 @@ main_app_ui <- bs4DashPage(
             elevation = 3,
             div(
               style = "text-align: center; margin-bottom: 2rem;",
-              img(src = "assets/icons/app_icon.png", width = "320px", alt = "TagPilot Premium Logo")
+              img(src = "assets/icons/app_icon.png", width = "320px", alt = "TagPilot Premium2 Logo")
             ),
-            h1("精準行銷平台", style = "text-align: center; color: #007bff; margin-bottom: 2rem;"),
+            h1("精準行銷平台 Premium2", style = "text-align: center; color: #007bff; margin-bottom: 2rem;"),
 
             h2("🎯 服務描述", style = "color: #343a40; border-bottom: 2px solid #007bff; padding-bottom: 0.5rem;"),
             p(
-              "我們是一套由 AI 驅動的精準行銷平台，協助品牌根據客戶特徵與行為數據，制定個人化行銷策略。我們整合 NLP、推薦系統與自動化分析以及統計和行銷理論，提供高效且可擴展的解決方案，協助行銷團隊更快達成轉換與黏著目標。",
+              "我們是一套由 AI 驅動的精準行銷平台 Premium2，採用創新的 T×V Grid 映射技術，透過 mapping.csv 配置文件將客戶的 Tempo (復購頻率) 和 Value (終身價值) 組合映射到對應的靜態區隔。協助品牌根據客戶特徵與行為數據，制定個人化行銷策略。",
               style = "font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem;"),
             p("本平台除了能提供企業上針對過去資料的洞見外，也能進一步協助新產品開發。",
               style = "font-size: 1.1rem; line-height: 1.6; margin-bottom: 2rem;"),
@@ -239,7 +239,7 @@ main_app_ui <- bs4DashPage(
                 style = "list-style: none; padding: 0; margin: 0;",
                 tags$li(
                   icon("bullseye"),
-                  " 客群分群建模（Segmentation Modeling）",
+                  " T×V Grid 映射客群分群建模（T×V Grid Segmentation Modeling）",
                   style = "margin-bottom: 0.8rem; font-size: 1.1rem;"
                 ),
                 tags$li(
@@ -299,34 +299,38 @@ main_app_ui <- bs4DashPage(
                 style = "margin-bottom: 1rem; font-size: 1.1rem;"
               ),
               p(
-                strong("聯絡資訊: "),
-                tags$a(
-                  href = "mailto:partners@peakededges.com",
-                  "partners@peakededges.com",
-                  style = "color: #007bff; text-decoration: none;"
-                ),
+                strong("負責人: "),
+                "王祈鋒",
                 style = "margin-bottom: 1rem; font-size: 1.1rem;"
               ),
               p(
-                "如需商業合作或平台體驗，請聯絡資料分析團隊。",
-                style = "font-style: italic; color: #6c757d; margin-bottom: 0;"
+                strong("電話: "),
+                "02-2778-2839",
+                style = "margin-bottom: 1rem; font-size: 1.1rem;"
+              ),
+              p(
+                strong("Email: "),
+                tags$a(href = "mailto:info@insightforge.ai", "info@insightforge.ai", style = "color: #1976d2;"),
+                style = "font-size: 1.1rem;"
+              )
+            ),
+
+            br(),
+
+            div(
+              style = "text-align: center; background: #f3e5f5; padding: 1rem; border-radius: 8px;",
+              p(
+                "🚀 TagPilot Premium2 v18 | T×V Grid Mapping 客戶網格映射分析平台",
+                style = "margin: 0; color: #673ab7; font-weight: bold;"
               )
             )
           )
         )
       )
     )
-  ),
-
-  # 頁尾
-  footer = bs4DashFooter(
-    fixed = TRUE,
-    left = "TagPilot Premium v18 - 精準行銷平台",
-    right = "© 2024 All Rights Reserved"
   )
 )
 
-# ── 資源路徑設定 (在 UI 定義前) ──────────────────────────────────────────
 # 設定 global_scripts 資源路徑
 addResourcePath("assets", "scripts/global_scripts/24_assets")
 
@@ -345,7 +349,7 @@ ui <- fluidPage(
     condition = "output.user_logged_in == false",
     div(style = "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 2rem 0;",
         loginModuleUI("login1",
-                      app_title = "TagPilot Premium",
+                      app_title = "TagPilot Premium2",
                       app_icon = "assets/icons/app_icon.png",
                       contacts_md = "md/contacts.md",
                       background_color = "transparent",
@@ -396,8 +400,8 @@ server <- function(input, output, session) {
     }
   }, ignoreInit = TRUE)
 
-    # DNA 分析模組 Premium with IPT T-Series Insight
-    dna_mod <- dnaMultiPremiumModuleServer("dna_multi1", con_global, user_info, upload_mod$dna_data)
+    # DNA 分析模組 Premium2 with T×V Grid Mapping
+    dna_mod <- dnaMultiPremium2ModuleServer("dna_multi1", con_global, user_info, upload_mod$dna_data)
 
   # 登入狀態輸出
   output$user_logged_in <- reactive({

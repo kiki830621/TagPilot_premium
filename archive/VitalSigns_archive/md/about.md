@@ -28,4 +28,4 @@
 
 公司: 祈鋒行銷科技有限公司
 
-聯絡資訊: [林郁翔](yuhsiang@utaipei.edu.tw)
+聯絡資訊: [partners@peakededges.com](partners@peakededges.com)
