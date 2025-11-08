@@ -33,7 +33,9 @@ REQUIRED_PACKAGES <- c(
   "DT",
   "GGally",
   "plotly",
-  
+  "networkD3",
+  "htmlwidgets",
+
   # UI 和主題
   "bslib",
   "bs4Dash",
@@ -112,6 +114,8 @@ load_packages <- function() {
     library(bs4Dash)
     library(dotenv)
     library(plotly)
+    library(networkD3)
+    library(htmlwidgets)
     library(duckdb)
     library(httr2)
     library(future)
