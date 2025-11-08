@@ -584,8 +584,8 @@ server <- function(input, output, session) {
   images_path <- if (dir.exists("www/images")) "www/images" else "www"
   addResourcePath("images", images_path)
 
-  # 登入模組（不傳遞連接，讓模組內部使用 db_query 和 db_execute）
-  login_mod <- loginModuleServer("login1")
+  # 登入模組
+  login_mod <- loginModuleServer("login1", con_global)
 
   observe({
     user_info(login_mod$user_info())
