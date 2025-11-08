@@ -11,9 +11,34 @@ uploadModuleUI <- function(id) {
       # DNA 分析資料上傳
       div(
         h5("上傳 DNA 分析資料"),
-        p("支援格式：", tags$strong("Amazon 銷售報告"), "、一般交易記錄"),
-        p("自動偵測欄位：客戶ID/Email、時間、金額等"),
-        fileInput(ns("dna_files"), "多檔案上傳 (自動合併)", multiple = TRUE, accept = c(".xlsx", ".xls", ".csv")),
+        div(style = "background-color: #e7f3ff; padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;",
+          h6(style = "margin-top: 0;", tags$strong("📊 資料需求")),
+          tags$ul(style = "margin-bottom: 5px;",
+            tags$li("請上傳至少", tags$strong(style = "color: #dc3545;", "1~3 年"), "的顧客交易數據"),
+            tags$li("資料檔須包含顧客 ID、購買時間和購買金額"),
+            tags$li("可同時上傳多個月份檔案"),
+            tags$li("建議", tags$strong(style = "color: #dc3545;", "12-36 個月")),
+            tags$li(tags$strong(style = "color: #dc3545;", "檔案數上限：36 個檔案"), "（3 年資料）"),
+            tags$li("檔案格式：", tags$strong("CSV"), "（推薦）、XLSX")
+          )
+        ),
+        div(style = "background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745; margin-bottom: 15px;",
+          h6(style = "margin-top: 0;", tags$strong("📋 必填欄位")),
+          tags$ol(style = "margin-bottom: 5px;",
+            tags$li(tags$strong("ID"), " 或 ", tags$strong("Email"), " - 識別顧客的代碼",
+                    tags$br(), tags$small(style = "color: #6c757d;", "系統可識別：customer_id, email, buyer_email")),
+            tags$li(tags$strong("purchase_time"), " - 顧客購買產品的時間點",
+                    tags$br(), tags$small(style = "color: #6c757d;", "格式須符合 EXCEL 規範，如 YYYY-MM-DD"),
+                    tags$br(), tags$small(style = "color: #6c757d;", "系統可識別：payment_time, purchase_time, purchase_date, date")),
+            tags$li(tags$strong("price"), " - 購買產品所花費的金額（數值型態）",
+                    tags$br(), tags$small(style = "color: #6c757d;", "系統可識別：lineitem_price, amount, price"))
+          ),
+          p(style = "margin-bottom: 0; color: #6c757d; font-size: 0.9em;",
+            "💡 系統會自動偵測並對應以上欄位，支援多種命名格式；當系統無法讀取上述變數時，通常是因為顧客 ID、購買時間和購買金額這三個變數名稱無法被識別。您可以根據這三個變數的英文名稱進行修改，這樣系統就能正確對應和識別。"),
+          p(style = "margin-bottom: 0; color: #dc3545; font-size: 0.9em;",
+            "💡 提醒：price 係指顧客購買產品所花費的金額，若為跨境電商交易，須注意幣值需換算和統一。")
+        ),
+        fileInput(ns("dna_files"), "📁 多檔案上傳（自動合併）", multiple = TRUE, accept = c(".xlsx", ".xls", ".csv")),
         br()
       ),
       
@@ -96,8 +121,32 @@ uploadModuleServer <- function(id, con, user_info) {
       if (!is.null(input$dna_files) && nrow(input$dna_files) > 0) {
         tryCatch({
           files <- input$dna_files
+
+          # ✅ 檔案數量限制檢查（上限36個檔案 = 3年資料）
+          MAX_FILES <- 36
+          if (nrow(files) > MAX_FILES) {
+            output$step1_msg <- renderText(
+              sprintf("⚠️ 檔案數量超過上限！\n已上傳 %d 個檔案，但系統最多只能處理 %d 個檔案（3年資料）。\n請減少檔案數量後重新上傳。",
+                      nrow(files), MAX_FILES)
+            )
+            return()
+          }
+
+          # 顯示檔案數量資訊
+          if (nrow(files) >= 12) {
+            output$step1_msg <- renderText(
+              sprintf("✅ 已選擇 %d 個檔案（約 %.1f 年資料），符合建議。正在處理中...",
+                      nrow(files), nrow(files)/12)
+            )
+          } else {
+            output$step1_msg <- renderText(
+              sprintf("⚠️ 已選擇 %d 個檔案（不足1年資料）。建議上傳至少12個月份的資料以獲得更準確的分析結果。\n正在處理中...",
+                      nrow(files))
+            )
+          }
+
           all_data <- list()
-          
+
           for (i in seq_len(nrow(files))) {
             ext <- tolower(tools::file_ext(files$name[i]))
             if (!ext %in% c("xlsx", "xls", "csv")) {
@@ -137,7 +186,27 @@ uploadModuleServer <- function(id, con, user_info) {
         
         # 偵測並標準化欄位
         fields <- detect_fields(combined_data)
-        
+
+        # ✅ 任務 1.2: 增強欄位驗證，提供清楚的錯誤訊息
+        missing_fields <- c()
+        if (is.null(fields$customer_id)) missing_fields <- c(missing_fields, "客戶ID")
+        if (is.null(fields$time)) missing_fields <- c(missing_fields, "交易時間")
+        if (is.null(fields$amount)) missing_fields <- c(missing_fields, "交易金額")
+
+        if (length(missing_fields) > 0) {
+          error_message <- paste0(
+            "❌ 缺少必填欄位：", paste(missing_fields, collapse = "、"), "\n\n",
+            "請確保上傳的檔案包含以下欄位：\n",
+            "• 客戶ID - customer_id, email, buyer_email\n",
+            "• 交易時間 - payment_time, purchase_date, date\n",
+            "• 交易金額 - lineitem_price, amount, price\n\n",
+            "目前檔案的欄位：", paste(names(combined_data), collapse = ", ")
+          )
+          output$step1_msg <- renderText(error_message)
+          return()
+        }
+
+        # 所有必填欄位都存在，繼續標準化
         if (!is.null(fields$customer_id) && !is.null(fields$time) && !is.null(fields$amount)) {
           # 標準化資料格式
           standardized_data <- combined_data
@@ -186,6 +255,9 @@ uploadModuleServer <- function(id, con, user_info) {
         showNotification("⚠️ 請先上傳並預覽DNA分析資料", type = "error")
         return()
       }
+
+      # 導向到顧客價值頁面
+      updateTabItems(session = session, inputId = "sidebar_menu", selected = "rfm_analysis")
     })
     
     # ---- export ------------------------------------------------------------

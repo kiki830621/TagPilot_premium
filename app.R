@@ -83,7 +83,16 @@ source("modules/module_wo_b.R")       # 主要分析模組
 source("scripts/global_scripts/10_rshinyapp_components/login/login_module.R")  # 登入模組
 source("modules/module_upload.R")     # 上傳模組
 source("modules/module_dna.R")
-source("modules/module_dna_multi_premium.R")  # DNA 分析模組 Premium with IPT T-Series Insight
+source("modules/module_dna_multi_premium_v2.R")  # DNA 分析模組 Premium V2 with Z-Score Customer Dynamics
+
+# ── 載入六列分析模組 ─────────────────────────────────────────────────────
+source("modules/module_customer_base_value.R")      # 客戶基數價值
+source("modules/module_customer_value_analysis.R")  # RFM 價值分析
+source("modules/module_customer_activity.R")        # 顧客活躍度分析 (CAI)
+source("modules/module_customer_status.R")          # 客戶狀態分析
+source("modules/module_rsv_matrix.R")               # R/S/V 生命力矩陣
+source("modules/module_lifecycle_prediction.R")     # 生命週期預測
+source("modules/module_advanced_analytics.R")       # 進階分析（需歷史資料）
 
 # ── reactive values -----------------------------------------------------------
 facets_rv   <- reactiveVal(NULL)  # 目前 LLM 產出的 10 個屬性 (字串向量)
@@ -139,35 +148,80 @@ main_app_ui <- bs4DashPage(
 
     # 步驟指示器
     div(class = "step-indicator",
-        div(class = "step-item", id = "step_1", "1. 上傳資料"),
-        div(class = "step-item", id = "step_2", "2. T-Series 客戶生命週期")
+        div(class = "step-item", id = "step_1", "1. 上傳"),
+        div(class = "step-item", id = "step_2", "2. 九宮格"),
+        div(class = "step-item", id = "step_3", "3. 詳細分析")
     ),
 
     # 選單
     sidebarMenu(
       id = "sidebar_menu",
       bs4SidebarHeader("分析流程"),
+      # (1) 資料上傳
       bs4SidebarMenuItem(
         text = "資料上傳",
         tabName = "upload",
         icon = icon("upload")
       ),
+      # (2) 顧客價值 - 最近購買日、購買頻率、購買金額、RFM 分析
       bs4SidebarMenuItem(
-        text = "T-Series 客戶生命週期分析",
+        text = "顧客價值",
+        tabName = "rfm_analysis",
+        icon = icon("chart-pie")
+      ),
+      # (3) 顧客活躍度 - CAI 分析 (待開發)
+      bs4SidebarMenuItem(
+        text = "顧客活躍度",
+        tabName = "cai_analysis",
+        icon = icon("chart-line")
+      ),
+      # (4) 顧客動態 - 顧客狀態、顧客流失風險、顧客入店資歷
+      bs4SidebarMenuItem(
+        text = "顧客動態",
+        tabName = "customer_status",
+        icon = icon("heartbeat")
+      ),
+      # (5) 顧客價值與動態市場區隔分析 (取代 Value × Activity 九宮格)
+      bs4SidebarMenuItem(
+        text = "顧客價值與動態市場區隔分析",
         tabName = "dna_analysis",
-        icon = icon("dna")
+        icon = icon("th")
+      ),
+      # (6) 顧客基礎價值 - 顧客購買週期、過去價值、客單價
+      bs4SidebarMenuItem(
+        text = "顧客基礎價值",
+        tabName = "base_value",
+        icon = icon("coins")
+      ),
+      # (7) 顧客生命週期預測 (靜止戶預測、回購時間、交易穩定度、CLV)
+      bs4SidebarMenuItem(
+        text = "生命週期預測",
+        tabName = "lifecycle_pred",
+        icon = icon("clock")
+      ),
+      # 保留：R/S/V 生命力矩陣 & 進階分析
+      bs4SidebarMenuItem(
+        text = "R/S/V 生命力矩陣",
+        tabName = "rsv_matrix",
+        icon = icon("cube")
+      ),
+      bs4SidebarMenuItem(
+        text = "進階分析（需歷史資料）",
+        tabName = "advanced_analytics",
+        icon = icon("chart-line")
       ),
       bs4SidebarHeader("平台資訊"),
       bs4SidebarMenuItem(
         text = "關於我們",
         tabName = "about",
         icon = icon("info-circle")
-      )
-    ),
+      ),
 
-    # 登出按鈕
-    div(style = "position: absolute; bottom: 20px; width: calc(100% - 40px);",
-        actionButton("logout", "登出", class = "btn-secondary btn-block", icon = icon("sign-out-alt"))
+      # 登出按鈕（放在選單最底部）
+      div(style = "margin-top: 20px; padding: 0 15px;",
+        actionButton("logout", "登出", class = "btn-secondary btn-block", icon = icon("sign-out-alt"),
+                     style = "width: 100%;")
+      )
     )
   ),
 
@@ -194,17 +248,113 @@ main_app_ui <- bs4DashPage(
 
 
 
-      # DNA 分析頁面
+      # 顧客價值與動態市場區隔分析（原 DNA 分析）
       bs4TabItem(
         tabName = "dna_analysis",
         fluidRow(
           bs4Card(
-            title = "步驟 2：TagPilot Premium - T-Series Insight 客戶生命週期分析",
+            title = "顧客價值與動態市場區隔分析",
             status = "success",
             width = 12,
             solidHeader = TRUE,
             elevation = 3,
             dnaMultiPremiumModuleUI("dna_multi1")
+          )
+        )
+      ),
+
+      # 客戶基數價值
+      bs4TabItem(
+        tabName = "base_value",
+        fluidRow(
+          bs4Card(
+            title = NULL,
+            status = "info",
+            width = 12,
+            solidHeader = FALSE,
+            elevation = 3,
+            customerBaseValueUI("base_value_module")
+          )
+        )
+      ),
+
+      # RFM 價值分析
+      bs4TabItem(
+        tabName = "rfm_analysis",
+        fluidRow(
+          bs4Card(
+            title = NULL,
+            status = "primary",
+            width = 12,
+            solidHeader = FALSE,
+            elevation = 3,
+            customerValueAnalysisUI("rfm_module")
+          )
+        )
+      ),
+
+      # 顧客活躍度 (CAI)
+      bs4TabItem(
+        tabName = "cai_analysis",
+        customerActivityUI("customer_activity")
+      ),
+
+      # 客戶狀態
+      bs4TabItem(
+        tabName = "customer_status",
+        fluidRow(
+          bs4Card(
+            title = NULL,
+            status = "warning",
+            width = 12,
+            solidHeader = FALSE,
+            elevation = 3,
+            customerStatusUI("status_module")
+          )
+        )
+      ),
+
+      # R/S/V 生命力矩陣
+      bs4TabItem(
+        tabName = "rsv_matrix",
+        fluidRow(
+          bs4Card(
+            title = NULL,
+            status = "primary",
+            width = 12,
+            solidHeader = FALSE,
+            elevation = 3,
+            rsvMatrixUI("rsv_module")
+          )
+        )
+      ),
+
+      # 生命週期預測
+      bs4TabItem(
+        tabName = "lifecycle_pred",
+        fluidRow(
+          bs4Card(
+            title = NULL,
+            status = "success",
+            width = 12,
+            solidHeader = FALSE,
+            elevation = 3,
+            lifecyclePredictionUI("prediction_module")
+          )
+        )
+      ),
+
+      # Phase 5：進階分析
+      bs4TabItem(
+        tabName = "advanced_analytics",
+        fluidRow(
+          bs4Card(
+            title = NULL,
+            status = "info",
+            width = 12,
+            solidHeader = FALSE,
+            elevation = 3,
+            advancedAnalyticsUI("advanced_module")
           )
         )
       ),
@@ -238,27 +388,27 @@ main_app_ui <- bs4DashPage(
               tags$ul(
                 style = "list-style: none; padding: 0; margin: 0;",
                 tags$li(
-                  icon("bullseye"),
+                  icon("circle"),
                   " 客群分群建模（Segmentation Modeling）",
                   style = "margin-bottom: 0.8rem; font-size: 1.1rem;"
                 ),
                 tags$li(
-                  icon("brain"),
+                  icon("circle"),
                   " 意圖辨識與推薦系統（Intent Detection & Recommendation）",
                   style = "margin-bottom: 0.8rem; font-size: 1.1rem;"
                 ),
                 tags$li(
-                  icon("comments"),
+                  icon("circle"),
                   " 評論內容語意分析（Sentiment & Aspect Analysis）",
                   style = "margin-bottom: 0.8rem; font-size: 1.1rem;"
                 ),
                 tags$li(
-                  icon("chart-line"),
+                  icon("circle"),
                   " 行銷活動預測與績效追蹤（Campaign Forecasting & Tracking）",
                   style = "margin-bottom: 0.8rem; font-size: 1.1rem;"
                 ),
                 tags$li(
-                  icon("chart-bar"),
+                  icon("circle"),
                   " 多管道數據整合與儀表板（Omni-channel Dashboard & ETL）",
                   style = "font-size: 1.1rem;"
                 )
@@ -278,6 +428,59 @@ main_app_ui <- bs4DashPage(
                 style = paste(
                   "font-size: 1.2rem; color: #1976d2;",
                   "text-decoration: none; font-weight: bold;"
+                )
+              )
+            ),
+
+            hr(style = "margin: 2rem 0; border-color: #dee2e6;"),
+
+            # ✅ Task 7.5: 技術文檔連結
+            h2(
+              "📚 技術文檔",
+              style = "color: #343a40; border-bottom: 2px solid #007bff; padding-bottom: 0.5rem;"
+            ),
+            div(
+              style = "background: #f1f3f5; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;",
+              p(
+                "完整的技術文檔與分析邏輯說明：",
+                style = "font-size: 1.1rem; margin-bottom: 1rem;"
+              ),
+              tags$ul(
+                style = "list-style: none; padding: 0; margin: 0;",
+                tags$li(
+                  style = "margin-bottom: 1rem;",
+                  actionButton(
+                    "show_logic_doc",
+                    label = "📖 查看九宮格分析邏輯（45種策略組合）",
+                    class = "btn-info btn-lg",
+                    style = "width: 100%;"
+                  )
+                ),
+                tags$li(
+                  style = "margin-bottom: 1rem;",
+                  actionButton(
+                    "show_warnings_doc",
+                    label = "⚠️ 查看技術警告與限制說明",
+                    class = "btn-warning btn-lg",
+                    style = "width: 100%;"
+                  )
+                ),
+                tags$li(
+                  style = "margin-bottom: 1rem;",
+                  actionButton(
+                    "show_architecture_doc",
+                    label = "🏗️ 查看系統架構文檔",
+                    class = "btn-primary btn-lg",
+                    style = "width: 100%;"
+                  )
+                ),
+                tags$li(
+                  actionButton(
+                    "show_work_plan",
+                    label = "📋 查看功能開發計劃",
+                    class = "btn-success btn-lg",
+                    style = "width: 100%;"
+                  )
                 )
               )
             ),
@@ -389,15 +592,39 @@ server <- function(input, output, session) {
     sales_data(upload_mod$dna_data())  # 將DNA資料傳遞給sales_data以供DNA模組使用
   })
 
-  # 按「下一步」自動切換到DNA分析頁面
+  # 按「下一步」自動切換到顧客價值頁面
   observeEvent(upload_mod$proceed_step(), {
     if (!is.null(upload_mod$proceed_step()) && upload_mod$proceed_step() > 0 && !is.null(upload_mod$dna_data()) && nrow(upload_mod$dna_data()) > 0) {
-      updateTabItems(session, "sidebar_menu", "dna_analysis")
+      updateTabItems(session, "sidebar_menu", "rfm_analysis")
     }
   }, ignoreInit = TRUE)
 
-    # DNA 分析模組 Premium with IPT T-Series Insight
-    dna_mod <- dnaMultiPremiumModuleServer("dna_multi1", con_global, user_info, upload_mod$dna_data)
+  # DNA 分析模組 Premium with IPT T-Series Insight
+  dna_mod <- dnaMultiPremiumModuleServer("dna_multi1", con_global, user_info, upload_mod$dna_data)
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # 六列詳細分析模組（依序串接）
+  # ─────────────────────────────────────────────────────────────────────────
+  # 客戶基數價值（接收DNA模組的輸出）
+  base_value_data <- customerBaseValueServer("base_value_module", dna_mod)
+
+  # RFM 價值分析（接收客戶基數價值輸出）
+  rfm_data <- customerValueAnalysisServer("rfm_module", base_value_data)
+
+  # 顧客活躍度分析 (CAI)
+  customerActivityServer("customer_activity", rfm_data)
+
+  # 客戶狀態（接收RFM分析輸出）
+  status_data <- customerStatusServer("status_module", rfm_data)
+
+  # R/S/V 生命力矩陣（接收客戶狀態輸出）
+  rsv_data <- rsvMatrixServer("rsv_module", status_data)
+
+  # 生命週期預測（接收R/S/V矩陣輸出）
+  prediction_data <- lifecyclePredictionServer("prediction_module", rsv_data)
+
+  # 進階分析（接收生命週期預測輸出）
+  advanced_data <- advancedAnalyticsServer("advanced_module", prediction_data)
 
   # 登入狀態輸出
   output$user_logged_in <- reactive({
@@ -449,9 +676,81 @@ server <- function(input, output, session) {
         runjs("$('#step_1').addClass('active');")
       } else if (input$sidebar_menu == "dna_analysis") {
         runjs("$('#step_1').addClass('completed'); $('#step_2').addClass('active');")
+      } else if (input$sidebar_menu %in% c("base_value", "rfm_analysis", "customer_status", "lifecycle_pred")) {
+        runjs("$('#step_1').addClass('completed'); $('#step_2').addClass('completed'); $('#step_3').addClass('active');")
       }
       # 關於頁面不影響步驟指示器狀態
     }
+  })
+
+  # ✅ Task 7.5: 文檔按鈕點擊處理（使用 Modal 彈窗）
+
+  # 九宮格分析邏輯文檔
+  observeEvent(input$show_logic_doc, {
+    logic_content <- tryCatch({
+      readLines("documents/logic.md", encoding = "UTF-8") %>% paste(collapse = "\n")
+    }, error = function(e) {
+      "📄 文檔載入失敗。請確認 documents/logic.md 檔案存在。"
+    })
+
+    showModal(modalDialog(
+      title = "📖 九宮格分析邏輯（45種策略組合）",
+      HTML(markdown::markdownToHTML(text = logic_content, fragment.only = TRUE)),
+      easyClose = TRUE,
+      size = "xl",
+      footer = modalButton("關閉")
+    ))
+  })
+
+  # 技術警告文檔
+  observeEvent(input$show_warnings_doc, {
+    warnings_content <- tryCatch({
+      readLines("documents/warnings.md", encoding = "UTF-8") %>% paste(collapse = "\n")
+    }, error = function(e) {
+      "⚠️ 文檔載入失敗。請確認 documents/warnings.md 檔案存在。"
+    })
+
+    showModal(modalDialog(
+      title = "⚠️ 技術警告與限制說明",
+      HTML(markdown::markdownToHTML(text = warnings_content, fragment.only = TRUE)),
+      easyClose = TRUE,
+      size = "xl",
+      footer = modalButton("關閉")
+    ))
+  })
+
+  # 系統架構文檔
+  observeEvent(input$show_architecture_doc, {
+    arch_content <- tryCatch({
+      readLines("documents/TagPilot_Premium_App_Architecture_Documentation.md", encoding = "UTF-8") %>% paste(collapse = "\n")
+    }, error = function(e) {
+      "🏗️ 文檔載入失敗。請確認 documents/TagPilot_Premium_App_Architecture_Documentation.md 檔案存在。"
+    })
+
+    showModal(modalDialog(
+      title = "🏗️ TagPilot Premium 系統架構文檔",
+      HTML(markdown::markdownToHTML(text = arch_content, fragment.only = TRUE)),
+      easyClose = TRUE,
+      size = "xl",
+      footer = modalButton("關閉")
+    ))
+  })
+
+  # 功能開發計劃
+  observeEvent(input$show_work_plan, {
+    plan_content <- tryCatch({
+      readLines("documents/Work_Plan_TagPilot_Premium_Enhancement.md", encoding = "UTF-8") %>% paste(collapse = "\n")
+    }, error = function(e) {
+      "📋 文檔載入失敗。請確認 documents/Work_Plan_TagPilot_Premium_Enhancement.md 檔案存在。"
+    })
+
+    showModal(modalDialog(
+      title = "📋 TagPilot Premium 功能開發計劃",
+      HTML(markdown::markdownToHTML(text = plan_content, fragment.only = TRUE)),
+      easyClose = TRUE,
+      size = "xl",
+      footer = modalButton("關閉")
+    ))
   })
 
   # 登出按鈕

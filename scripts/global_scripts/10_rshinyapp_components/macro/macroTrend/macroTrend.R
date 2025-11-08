@@ -682,10 +682,11 @@ macroTrendServer <- function(id,
       if (is.null(metrics) || is.na(metrics$trend_direction)) {
         value <- defaults$trend_direction
         color <- "secondary"
+        icon_name <- "minus"  # Default icon when no data
       } else {
         direction <- metrics$trend_direction
         value <- direction
-        
+
         # Set color based on direction
         if (direction == "Positive") {
           color <- "success"
@@ -698,7 +699,7 @@ macroTrendServer <- function(id,
           icon_name <- "equals"
         }
       }
-      
+
       bs4Dash::valueBox(
         value = value,
         subtitle = "Trend Direction",

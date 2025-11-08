@@ -426,22 +426,13 @@ analysis_dna <- function(df_sales_by_customer, df_sales_by_customer_by_date, ski
     dt[, payment_time := as.POSIXct(payment_time)]
     if (verbose) message("Converted payment_time column to POSIXct format")
   }
-  
-  # Calculate time_now safely
-  time_now <- tryCatch({
-    max_time <- max(dt$payment_time, na.rm = TRUE)
-    if (is.infinite(max_time) || is.na(max_time)) {
-      if (verbose) message("Warning: Cannot determine maximum payment_time from data. Using current time.")
-      Sys.time()
-    } else {
-      max_time
-    }
-  }, error = function(e) {
-    if (verbose) message("Error calculating max payment_time: ", e$message, ". Using current time.")
-    Sys.time()
-  })
-  
-  if (verbose) message("Reference time established: ", as.character(time_now))
+
+  # Calculate time_now using system current time for absolute recency
+  # Changed from max(payment_time) to Sys.time() per Req #3.2.1
+  # This shows days since last purchase relative to today, not relative to data end date
+  time_now <- Sys.time()
+
+  if (verbose) message("Reference time (current system time): ", as.character(time_now))
   
   #--------------------------------------------
   # 2. RFM Calculation
