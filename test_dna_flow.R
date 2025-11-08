@@ -65,7 +65,7 @@ dna_result <- analysis_dna(
 cat("\n=== Step 4: Check Output ===\n")
 customer_data <- dna_result$data_by_customer
 
-if (is.data.table::data.table(customer_data)) {
+if (data.table::is.data.table(customer_data)) {
   customer_data <- as_tibble(customer_data)
 }
 
