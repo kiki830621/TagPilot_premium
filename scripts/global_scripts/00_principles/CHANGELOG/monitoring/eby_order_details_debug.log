@@ -1,0 +1,1465 @@
+================================================================================
+🔍 DEBUG MODE: MAMBA eBay Order Details Staging
+DEBUG: Script: eby_ETL_order_details_1ST___MAMBA_DEBUG.R
+DEBUG: Company-specific implementation for MAMBA
+DEBUG: Data type: Order Details (BAYORE staging)
+DEBUG: Started at: 2025-08-31 14:16:39.766784
+================================================================================
+DEBUG: Setting up error handling...
+DEBUG: Checking working directory...
+DEBUG: Current working directory: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA
+DEBUG: Checking for autoinit function...
+DEBUG: ✅ autoinit function already exists
+DEBUG: Calling autoinit()...
+>> OPERATION_MODE = UPDATE_MODE
+✅ Loaded package 'stringr' successfully.
+
+✅ Loaded package 'glue' successfully.
+
+✅ Loaded package 'tools' successfully.
+
+✅ Loaded package 'yaml' successfully.
+
+✅ Loaded package 'future' successfully.
+
+✅ Loaded package 'future.mirai' successfully.
+
+✅ Loaded package 'promises' successfully.
+
+✅ Loaded package 'later' successfully.
+
+
+✅ Loaded package 'dotenv' successfully.
+
+✅ Loaded package 'DBI' successfully.
+
+✅ Loaded package 'duckdb' successfully.
+
+
+載入套件：‘arrow’
+
+下列物件被遮斷自 ‘package:utils’:
+
+    timestamp
+
+✅ Loaded package 'arrow' successfully.
+
+
+載入套件：‘dplyr’
+
+下列物件被遮斷自 ‘package:stats’:
+
+    filter, lag
+
+下列物件被遮斷自 ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+✅ Loaded package 'dplyr' successfully.
+
+✅ Loaded package 'tidyr' successfully.
+
+✅ Loaded package 'readr' successfully.
+
+✅ Loaded package 'readxl' successfully.
+
+✅ Loaded package 'openxlsx' successfully.
+
+
+載入套件：‘data.table’
+
+下列物件被遮斷自 ‘package:dplyr’:
+
+    between, first, last
+
+✅ Loaded package 'data.table' successfully.
+
+✅ Loaded package 'jsonlite' successfully.
+
+
+載入套件：‘lubridate’
+
+下列物件被遮斷自 ‘package:data.table’:
+
+    hour, isoweek, mday, minute, month, quarter, second, wday, week,
+    yday, year
+
+下列物件被遮斷自 ‘package:arrow’:
+
+    duration
+
+下列物件被遮斷自 ‘package:base’:
+
+    date, intersect, setdiff, union
+
+✅ Loaded package 'lubridate' successfully.
+
+
+載入套件：‘scales’
+
+下列物件被遮斷自 ‘package:readr’:
+
+    col_factor
+
+✅ Loaded package 'scales' successfully.
+
+
+載入套件：‘purrr’
+
+下列物件被遮斷自 ‘package:scales’:
+
+    discard
+
+下列物件被遮斷自 ‘package:jsonlite’:
+
+    flatten
+
+下列物件被遮斷自 ‘package:data.table’:
+
+    transpose
+
+✅ Loaded package 'purrr' successfully.
+
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ forcats 1.0.0     ✔ tibble  3.3.0
+✔ ggplot2 3.5.2     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ data.table::between() masks dplyr::between()
+✖ scales::col_factor()  masks readr::col_factor()
+✖ purrr::discard()      masks scales::discard()
+✖ lubridate::duration() masks arrow::duration()
+✖ dplyr::filter()       masks stats::filter()
+✖ data.table::first()   masks dplyr::first()
+✖ purrr::flatten()      masks jsonlite::flatten()
+✖ lubridate::hour()     masks data.table::hour()
+✖ lubridate::isoweek()  masks data.table::isoweek()
+✖ dplyr::lag()          masks stats::lag()
+✖ data.table::last()    masks dplyr::last()
+✖ lubridate::mday()     masks data.table::mday()
+✖ lubridate::minute()   masks data.table::minute()
+✖ lubridate::month()    masks data.table::month()
+✖ lubridate::quarter()  masks data.table::quarter()
+✖ lubridate::second()   masks data.table::second()
+✖ purrr::transpose()    masks data.table::transpose()
+✖ lubridate::wday()     masks data.table::wday()
+✖ lubridate::week()     masks data.table::week()
+✖ lubridate::yday()     masks data.table::yday()
+✖ lubridate::year()     masks data.table::year()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+✅ Loaded package 'tidyverse' successfully.
+
+✅ Loaded package 'httr2' successfully.
+
+✅ Loaded package 'fastDummies' successfully.
+
+
+載入套件：‘dbplyr’
+
+下列物件被遮斷自 ‘package:dplyr’:
+
+    ident, sql
+
+✅ Loaded package 'dbplyr' successfully.
+
+The duckplyr package is configured to fall back to dplyr when it encounters an
+incompatibility. Fallback events can be collected and uploaded for analysis to
+guide future development. By default, data will be collected but no data will
+be uploaded.
+ℹ Automatic fallback uploading is not controlled and therefore disabled, see
+  `?duckplyr::fallback()`.
+✔ Number of reports ready for upload: 463.
+→ Review with `duckplyr::fallback_review()`, upload with
+  `duckplyr::fallback_upload()`.
+ℹ Configure automatic uploading with `duckplyr::fallback_config()`.
+✔ Overwriting dplyr methods with duckplyr methods.
+ℹ Turn off with `duckplyr::methods_restore()`.
+
+載入套件：‘duckplyr’
+
+下列物件被遮斷自 ‘package:duckdb’:
+
+    read_csv_duckdb
+
+✅ Loaded package 'duckplyr' successfully.
+
+
+載入套件：‘psych’
+
+下列物件被遮斷自 ‘package:ggplot2’:
+
+    %+%, alpha
+
+下列物件被遮斷自 ‘package:scales’:
+
+    alpha, rescale
+
+✅ Loaded package 'psych' successfully.
+
+✅ Loaded package 'furrr' successfully.
+
+✅ Loaded package 'dtplyr' successfully.
+
+載入需要的套件：lattice
+
+載入套件：‘caret’
+
+下列物件被遮斷自 ‘package:purrr’:
+
+    lift
+
+下列物件被遮斷自 ‘package:future’:
+
+    cluster
+
+✅ Loaded package 'caret' successfully.
+
+
+載入套件：‘progressr’
+
+下列物件被遮斷自 ‘package:caret’:
+
+    progress
+
+✅ Loaded package 'progressr' successfully.
+
+✅ Loaded package 'googledrive' successfully.
+
+
+載入套件：‘googlesheets4’
+
+下列物件被遮斷自 ‘package:googledrive’:
+
+    request_generate, request_make
+
+✅ Loaded package 'googlesheets4' successfully.
+
+
+載入套件：‘shiny’
+
+下列物件被遮斷自 ‘package:jsonlite’:
+
+    validate
+
+✅ Loaded package 'shiny' successfully.
+
+
+載入套件：‘bslib’
+
+下列物件被遮斷自 ‘package:utils’:
+
+    page
+
+✅ Loaded package 'bslib' successfully.
+
+
+載入套件：‘plotly’
+
+下列物件被遮斷自 ‘package:ggplot2’:
+
+    last_plot
+
+下列物件被遮斷自 ‘package:arrow’:
+
+    schema
+
+下列物件被遮斷自 ‘package:stats’:
+
+    filter
+
+下列物件被遮斷自 ‘package:graphics’:
+
+    layout
+
+✅ Loaded package 'plotly' successfully.
+
+
+載入套件：‘shinyjs’
+
+下列物件被遮斷自 ‘package:shiny’:
+
+    runExample
+
+下列物件被遮斷自 ‘package:lubridate’:
+
+    show
+
+下列物件被遮斷自 ‘package:duckdb’:
+
+    show
+
+下列物件被遮斷自 ‘package:DBI’:
+
+    show
+
+下列物件被遮斷自 ‘package:future’:
+
+    reset
+
+下列物件被遮斷自 ‘package:methods’:
+
+    removeClass, show
+
+✅ Loaded package 'shinyjs' successfully.
+
+✅ Loaded package 'htmltools' successfully.
+
+
+載入套件：‘fontawesome’
+
+下列物件被遮斷自 ‘package:psych’:
+
+    fa
+
+✅ Loaded package 'fontawesome' successfully.
+
+
+載入套件：‘DT’
+
+下列物件被遮斷自 ‘package:shiny’:
+
+    dataTableOutput, renderDataTable
+
+✅ Loaded package 'DT' successfully.
+
+Package initialization complete for UPDATE_MODE:
+- 41 packages loaded successfully
+
+
+Environment variables loaded from .env using dotenv package
+✓ OPENAI_API_KEY is set
+
+載入套件：‘httr’
+
+下列物件被遮斷自 ‘package:plotly’:
+
+    config
+
+下列物件被遮斷自 ‘package:progressr’:
+
+    progress
+
+下列物件被遮斷自 ‘package:caret’:
+
+    progress
+
+Custom operators loaded: %|>%, %||%, %+%, %notin%, %between%, %col%, %apply%
+Loaded acceleration helper functions (P106: Performance Acceleration Principle)
+App directory (current working directory): /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA
+Root directory (parent directory): /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise
+Path configuration exported to R file: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/root_path.R
+Performance acceleration control function loaded
+Object identification utilities loaded successfully.
+[1] "資料夾已存在於: ../data"
+🔄 Loading Position Table Access Functions...
+✅ fn_get_position_complete_case already available
+✅ fn_get_position_demonstrate_case loaded successfully
+🎯 Position Table Access Functions ready for use!
+
+📋 Available functions:
+   • fn_get_position_complete_case() - for modules needing Ideal/Rating/Revenue rows
+   • fn_get_position_demonstrate_case() - for modules showing only market data
+
+🔍 Both functions support type filtering to show only '屬性' columns
+
+
+New names:
+• `` -> `...3`
+APP_MODE initialization finished. Databases available: app_data, raw_data, staged_data, cleansed_data, transformed_data, processed_data, meta_data, comment_property_rating, comment_property_rating_temp, comment_property_rating_results
+Initialization already completed – skipping.
+UPDATE_MODE: Checking for .env file...
+
+UPDATE_MODE: ✅ Environment variables loaded from .env using dotenv package
+UPDATE_MODE: ✓ EBY_SSH_HOST is set
+UPDATE_MODE: ✓ EBY_SQL_HOST is set
+UPDATE_MODE: ✓ EBY_SQL_DATABASE is set
+✅ Package 'stringr' already attached.
+
+✅ Package 'glue' already attached.
+
+✅ Package 'tools' already attached.
+
+✅ Package 'yaml' already attached.
+
+✅ Package 'future' already attached.
+
+✅ Package 'future.mirai' already attached.
+
+✅ Package 'promises' already attached.
+
+✅ Package 'later' already attached.
+
+✅ Package 'dotenv' already attached.
+
+✅ Package 'DBI' already attached.
+
+✅ Package 'duckdb' already attached.
+
+✅ Package 'arrow' already attached.
+
+✅ Package 'dplyr' already attached.
+
+✅ Package 'tidyr' already attached.
+
+✅ Package 'readr' already attached.
+
+✅ Package 'readxl' already attached.
+
+✅ Package 'openxlsx' already attached.
+
+✅ Package 'data.table' already attached.
+
+✅ Package 'jsonlite' already attached.
+
+✅ Package 'lubridate' already attached.
+
+✅ Package 'scales' already attached.
+
+✅ Package 'purrr' already attached.
+
+✅ Package 'tidyverse' already attached.
+
+✅ Package 'httr2' already attached.
+
+✅ Package 'fastDummies' already attached.
+
+✅ Package 'dbplyr' already attached.
+
+✅ Package 'duckplyr' already attached.
+
+✅ Package 'psych' already attached.
+
+✅ Package 'furrr' already attached.
+
+✅ Package 'dtplyr' already attached.
+
+✅ Package 'caret' already attached.
+
+✅ Package 'progressr' already attached.
+
+✅ Package 'googledrive' already attached.
+
+✅ Package 'googlesheets4' already attached.
+
+✅ Package 'shiny' already attached.
+
+✅ Package 'bslib' already attached.
+
+✅ Package 'plotly' already attached.
+
+✅ Package 'shinyjs' already attached.
+
+✅ Package 'htmltools' already attached.
+
+✅ Package 'fontawesome' already attached.
+
+✅ Package 'DT' already attached.
+
+Package initialization complete for UPDATE_MODE:
+- 41 packages loaded successfully
+
+🔧 Starting to load global scripts...
+📁 Loading directory: 14_sql_utils 
+   📋 Found 6 R files
+   🔄 Loading: fn_create_summary_table.R ... ✅
+   🔄 Loading: fn_generate_column_definitions.R ... ✅
+   🔄 Loading: fn_process_column_def.R ... ✅
+   🔄 Loading: fn_quote_identifier.R ... ✅
+   🔄 Loading: fn_read_csvxlsx.R ... ✅
+   🔄 Loading: fn_sanitize_identifier.R ... ✅
+   ✅ Completed directory: 14_sql_utils 
+
+📁 Loading directory: 02_db_utils 
+   📋 Found 28 R files
+   🔄 Loading: fn_dbAttachDuckdb.R ... ✅
+   🔄 Loading: fn_dbConnectDuckdb.R ... ✅
+   🔄 Loading: fn_dbDetach_all.R ... ✅
+   🔄 Loading: fn_dbDetachDuckdb.R ... ✅
+   🔄 Loading: fn_dbOverwrite.R ... ✅
+   🔄 Loading: fn_duckdb_connection.R ... ✅
+   🔄 Loading: fn_duckdb_copy_optimized.R ... ✅
+   🔄 Loading: fn_duckdb_disconnect_with_export.R ... ✅
+   🔄 Loading: fn_duckdb_import_export.R ... ✅
+   🔄 Loading: fn_duckdb_list_columns.R ... ✅
+   🔄 Loading: fn_duckdb_mamba_patterns.R ... ✅
+   🔄 Loading: fn_duckdb_nested_types.R ... ✅
+   🔄 Loading: fn_duckdb_query_patterns.R ... ✅
+   🔄 Loading: fn_duckdb_type_conversion.R ... ✅
+   🔄 Loading: fn_export_duckdb_dataframes.R ... ✅
+   🔄 Loading: fn_get_default_db_paths.R ... ✅
+   🔄 Loading: fn_set_db_paths.R ... ✅
+   🔄 Loading: fn_coalesce_suffix_cols.R ... ✅
+   🔄 Loading: fn_data_cleaning.R ... ✅
+   🔄 Loading: fn_dbCopyTable.R ... ✅
+   🔄 Loading: fn_dbDisconnect_all.R ... ✅
+   🔄 Loading: fn_dbPrintInfo.R ... ✅
+   🔄 Loading: fn_ensure_mamba_tunnel_enhanced.R ... ✅
+   🔄 Loading: fn_ensure_mamba_tunnel.R ... ✅
+   🔄 Loading: fn_list_column_handling.R ... ✅
+   🔄 Loading: fn_nrow2.R ... ✅
+   🔄 Loading: fn_print_query.R ... ✅
+   🔄 Loading: fn_tbl2.R ... ✅
+   ✅ Completed directory: 02_db_utils 
+
+📁 Loading directory: 04_utils 
+   📋 Found 98 R files
+   🔄 Loading: fn_connect_to_app_database.R ... ✅
+   🔄 Loading: fn_detect_marketing_channel_availability.R ... ✅
+   🔄 Loading: fn_initialize_data_availability.R ... ✅
+   🔄 Loading: fn_is_available.R ... ✅
+   🔄 Loading: fn_load_platform_dictionary.R ... ✅
+   🔄 Loading: fn_render_adaptive_radio_buttons.R ... ✅
+   🔄 Loading: package.R ... ✅
+   🔄 Loading: fn_library2.R ... ✅
+   🔄 Loading: fn_nrow2.R ... ✅
+   🔄 Loading: fn_operators.R ...Custom operators loaded: %|>%, %||%, %+%, %notin%, %between%, %col%, %apply%
+ ✅
+   🔄 Loading: fn_acceleration_helpers.R ...Loaded acceleration helper functions (P106: Performance Acceleration Principle)
+ ✅
+   🔄 Loading: fn_aggregate_customer_purchases.R ... ✅
+   🔄 Loading: fn_analysis_dna.R ... ✅
+   🔄 Loading: fn_batch_renumber_resources.R ... ✅
+   🔄 Loading: fn_caesar_cipher.R ... ✅
+   🔄 Loading: fn_clean_column_names_remove_english.R ... ✅
+   🔄 Loading: fn_clean_column_names.R ... ✅
+   🔄 Loading: fn_clean_duplicate_columns.R ... ✅
+   🔄 Loading: fn_cleanse_amazon_reviews.R ... ✅
+   🔄 Loading: fn_cleanse_eby_reviews.R ... ✅
+   🔄 Loading: fn_coalesce_suffix_cols.R ... ✅
+   🔄 Loading: fn_combine_aligned_tables.R ... ✅
+   🔄 Loading: fn_confusion_matrix.R ... ✅
+   🔄 Loading: fn_create_update_script.R ... ✅
+   🔄 Loading: fn_decode_rating.R ... ✅
+   🔄 Loading: fn_detect_advanced_metrics_availability.R ... ✅
+   🔄 Loading: fn_detect_marketing_channel_availability.R ... ✅
+   🔄 Loading: fn_email_to_id.R ... ✅
+   🔄 Loading: fn_fct_na_value_to_level.R ... ✅
+   🔄 Loading: fn_filter_covariates.R ... ✅
+   🔄 Loading: fn_finalize_position_table.R ... ✅
+   🔄 Loading: fn_find_number_or_nan.R ... ✅
+   🔄 Loading: fn_functionalize.R ... ✅
+   🔄 Loading: fn_generate_dummy_matrix.R ... ✅
+   🔄 Loading: fn_get_product_id_label.R ... ✅
+   🔄 Loading: fn_get_r_files_recursive.R ... ✅
+   🔄 Loading: fn_git_sync.R ... ✅
+   🔄 Loading: fn_handle_na.R ... ✅
+   🔄 Loading: fn_import_csvxlsx.R ... ✅
+   🔄 Loading: fn_import_raw_data.R ... ✅
+   🔄 Loading: fn_initialize_data_availability.R ... ✅
+   🔄 Loading: fn_initialize_packages.R ... ✅
+   🔄 Loading: fn_keep_numeric_columns.R ... ✅
+   🔄 Loading: fn_left_join_remove_duplicate.R ... ✅
+   🔄 Loading: fn_left_join_remove_duplicate2.R ... ✅
+   🔄 Loading: fn_load_app_config.R ... ✅
+   🔄 Loading: fn_load_customer_data.R ... ✅
+   🔄 Loading: fn_load_product_lines.R ... ✅
+   🔄 Loading: fn_manage_packages.R ... ✅
+   🔄 Loading: fn_merge_position_tables.R ... ✅
+   🔄 Loading: fn_monitor_r_script.R ... ✅
+   🔄 Loading: fn_mutate_customer_id.R ... ✅
+   🔄 Loading: fn_na_handling_stats.R ... ✅
+   🔄 Loading: fn_parse_date_time3.R ... ✅
+   🔄 Loading: fn_parse_datetime_columns.R ... ✅
+   🔄 Loading: fn_process_amz_reviews.R ... ✅
+   🔄 Loading: fn_process_comment_property_ratings_by_asin.R ... ✅
+   🔄 Loading: fn_process_comment_property_ratings_by_product.R ... ✅
+   🔄 Loading: fn_process_eby_reviews.R ... ✅
+   🔄 Loading: fn_process_position_table.R ... ✅
+   🔄 Loading: fn_read_multiple_sheets.R ... ✅
+   🔄 Loading: fn_recommendation_product_id.R ... ✅
+   🔄 Loading: fn_remove_columns_by_proportion.R ... ✅
+   🔄 Loading: fn_remove_high_corr.R ... ✅
+   🔄 Loading: fn_remove_na_columns.R ... ✅
+   🔄 Loading: fn_remove_na_rows_in_columns.R ... ✅
+   🔄 Loading: fn_remove_na_strings.R ... ✅
+   🔄 Loading: fn_remove_novariation.R ... ✅
+   🔄 Loading: fn_renumber_resource.R ... ✅
+   🔄 Loading: fn_replace_non_numeric.R ... ✅
+   🔄 Loading: fn_replace_spaces.R ... ✅
+   🔄 Loading: fn_root_path_config.R ...App directory (current working directory): /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA
+Root directory (parent directory): /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise
+Path configuration exported to R file: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/root_path.R
+ ✅
+   🔄 Loading: fn_safe_get.R ... ✅
+   🔄 Loading: fn_set_acceleration.R ...Performance acceleration control function loaded
+ ✅
+   🔄 Loading: fn_source_directory.R ... ✅
+   🔄 Loading: fn_source_with_verbose.R ... ✅
+   🔄 Loading: fn_string_to_numeric.R ... ✅
+   🔄 Loading: fn_summarize_database_utils.R ... ✅
+   🔄 Loading: fn_summarize_database.R ... ✅
+   🔄 Loading: fn_transform_parse_date_time.R ... ✅
+   🔄 Loading: fn_translation.R ... ✅
+   🔄 Loading: fn_update_product_property_dtah.R ... ✅
+   🔄 Loading: fn_update_time_range.R ... ✅
+   🔄 Loading: fn_verify_consistency.R ... ✅
+   🔄 Loading: fn_verify_row_alignment.R ... ✅
+   🔄 Loading: fn_verify_unique.R ... ✅
+   🔄 Loading: fn_write_table_safe.R ... ✅
+   🔄 Loading: find_data_file.R ... ✅
+   🔄 Loading: get_descriptors.R ... ✅
+   🔄 Loading: get_rigid_id.R ... ✅
+   🔄 Loading: list_data_files.R ... ✅
+   🔄 Loading: list_versions.R ... ✅
+   🔄 Loading: load_version.R ... ✅
+   🔄 Loading: object_identification.R ...Object identification utilities loaded successfully.
+ ✅
+   🔄 Loading: save_version.R ... ✅
+   🔄 Loading: fn_paste_.R ... ✅
+   🔄 Loading: fn_remove_illegal_utf8.R ... ✅
+   🔄 Loading: package.R ... ✅
+   ✅ Completed directory: 04_utils 
+
+📁 Loading directory: 03_config 
+   📋 Found 5 R files
+   🔄 Loading: detect_root_path.R ... ✅
+   🔄 Loading: get_company_path.R ... ✅
+   🔄 Loading: write_root_path_for_bash.R ... ✅
+   🔄 Loading: global_parameters.R ... ✅
+   🔄 Loading: global_path_settings.R ...[1] "資料夾已存在於: ../data"
+ ✅
+   ✅ Completed directory: 03_config 
+
+📁 Loading directory: 01_db 
+   📋 Found 18 R files
+   🔄 Loading: 0101g_create_or_replace_amazon_competitor_sales_dta.R ... ✅
+   🔄 Loading: 0102g_create_or_replace_officialwebsite_km_sales_dta.R ... ✅
+   🔄 Loading: 103g_create_or_replace_product_property_dictionary.R ... ✅
+   🔄 Loading: 104g_create_or_replace_amazon_review_dta.R ... ✅
+   🔄 Loading: 105g_create_or_replace_amazon_sales_dta.R ... ✅
+   🔄 Loading: 106g_create_or_replace_sales_by_customer_date_dta.R ... ✅
+   🔄 Loading: 107g_create_or_replace_nrec_accu_dta.R ... ✅
+   🔄 Loading: 108g_create_or_replace_time_range_dta.R ... ✅
+   🔄 Loading: 109g_create_if_not_exist_gender_dictionary.R ... ✅
+   🔄 Loading: 110g_create_or_replace_sales_by_time_state_dta.R ... ✅
+   🔄 Loading: 111g_create_or_replace_sales_by_time_zip_dta.R ... ✅
+   🔄 Loading: 112g_create_or_replace_nes_trend.R ... ✅
+   🔄 Loading: 114g_setup_table.R ... ✅
+   🔄 Loading: fn_create_df_dna_by_customer.R ... ✅
+   🔄 Loading: fn_create_df_customer_profile.R ... ✅
+   🔄 Loading: fn_initialize_app_database.R ... ✅
+   🔄 Loading: fn_generate_create_table_query.R ... ✅
+   🔄 Loading: sc_create_mock_duckdb.R ...DuckDB will be created at: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/scripts/global_scripts/global_data/mock_data.duckdb
+
+======== MOCK DUCKDB CREATION UTILITY ========
+Creating database at: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/scripts/global_scripts/global_data/mock_data.duckdb 
+
+Tables being created:
+- customer_profile: Basic customer information
+- orders: Sample order data
+
+To use this database in your code:
+con <- DBI::dbConnect(duckdb::duckdb(), dbdir = " /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/scripts/global_scripts/global_data/mock_data.duckdb ")
+
+Usage examples:
+1. Get customers: dbGetQuery(con, "SELECT * FROM customer_profile")
+2. Get orders: dbGetQuery(con, "SELECT * FROM orders")
+3. Join data: dbGetQuery(con, "SELECT c.name, o.amount FROM customer_profile c JOIN orders o ON c.id = o.customer_id")
+
+Remember to disconnect when done: dbDisconnect(con, shutdown = TRUE)
+=============================================
+Created tables in /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/scripts/global_scripts/global_data/mock_data.duckdb: customer_profile, orders
+  id    name signup_date
+1  1   Alice  2021-01-01
+2  2     Bob  2021-06-15
+3  3 Charlie  2021-12-31
+Disconnected and shutdown /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/scripts/global_scripts/global_data/mock_data.duckdb
+
+======== ADDITIONAL NOTES ========
+The mock database has been successfully created and populated.
+
+To extend this database in the future:
+1. Add more sample tables by creating additional data frames
+2. For larger datasets, consider using dbWriteTable with read.csv()
+3. Create relationships between tables with foreign keys
+
+For testing universal_data_accessor function:
+- This database can be used with the universal_data_accessor function
+- Example: universal_data_accessor(db_conn, "customer_profile")
+
+For backup/versioning:
+- Make a copy of the database file for version control
+- Example: file.copy(" /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/scripts/global_scripts/global_data/mock_data.duckdb ", " /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/scripts/global_scripts/global_data/mock_data.duckdb .backup")
+================================
+ ✅
+   ✅ Completed directory: 01_db 
+
+📁 Loading directory: 05_etl_utils 
+   📋 Found 51 R files
+   🔄 Loading: fn_import_competitor_products.R ... ✅
+   🔄 Loading: fn_import_product_profiles.R ... ✅
+   🔄 Loading: fn_cleanse_amazon_reviews_etl.R ... ✅
+   🔄 Loading: fn_stage_comment_properties.R ... ✅
+   🔄 Loading: fn_stage_competitor_products.R ... ✅
+   🔄 Loading: fn_stage_product_profiles.R ... ✅
+   🔄 Loading: fn_process_amz_reviews_etl.R ... ✅
+   🔄 Loading: fn_transform_comment_properties.R ... ✅
+   🔄 Loading: fn_transform_competitor_products.R ... ✅
+   🔄 Loading: fn_transform_product_profiles.R ... ✅
+   🔄 Loading: 1001g_generate_amazon_check_data.R ... ✅
+   🔄 Loading: 203g_process_amazon_review.R ... ✅
+   🔄 Loading: 204g_process_and_join_positions.R ... ✅
+   🔄 Loading: 205g_process_amazon_sales.R ... ✅
+   🔄 Loading: 211g_process_address_and_time_amazon_sales.R ... ✅
+   🔄 Loading: 212g_process_promotion_recoding_amazon.R ... ✅
+   🔄 Loading: 401g_update_amazon_poisson_precision_marketing_dummy.R ... ✅
+   🔄 Loading: 403g_patch_amazon_reviews.R ... ✅
+   🔄 Loading: fn_import_comment_properties.R ... ✅
+   🔄 Loading: fn_import_comment_property_ratings.R ... ✅
+   🔄 Loading: fn_import_df_amz_competitor_sales.R ... ✅
+   🔄 Loading: import_amazon_sales.R ... ✅
+   🔄 Loading: 209g_process_zip.R ... ✅
+   🔄 Loading: 214g_process_and_save_all_products_states_and_times.R ... ✅
+   🔄 Loading: closest_position.R ... ✅
+   🔄 Loading: convert_chinese_chars_and_names.R ... ✅
+   🔄 Loading: convert_chinese_chars.R ... ✅
+   🔄 Loading: convert_list_columns.R ... ✅
+   🔄 Loading: convert_to_local_time.R ... ✅
+   🔄 Loading: convert_units_to_smallest.R ... ✅
+   🔄 Loading: Day_time_partition.R ... ✅
+   🔄 Loading: DNA_Function_data.table.R ... ✅
+   🔄 Loading: DNA_Function_dplyr.R ... ✅
+   🔄 Loading: fn_detect_data_types.R ... ✅
+   🔄 Loading: Holidays_Recode.R ... ✅
+   🔄 Loading: load_all_RDS.R ... ✅
+   🔄 Loading: load_selected_rds.R ... ✅
+   🔄 Loading: process_by_customer_time.R ... ✅
+   🔄 Loading: fn_read_csvxlsx.R ... ✅
+   🔄 Loading: revert_chinese_chars_and_names.R ... ✅
+   🔄 Loading: revert_chinese_chars.R ... ✅
+   🔄 Loading: save_customer_time_data.R ... ✅
+   🔄 Loading: save_list_elements.R ... ✅
+   🔄 Loading: StateNameTranformation.R ...hash-2.2.6.3 provided by Decision Patterns
+
+
+載入套件：‘hash’
+
+下列物件被遮斷自 ‘package:psych’:
+
+    make.keys
+
+下列物件被遮斷自 ‘package:data.table’:
+
+    copy
+
+
+載入套件：‘stringdist’
+
+下列物件被遮斷自 ‘package:tidyr’:
+
+    extract
+
+ ✅
+   🔄 Loading: fn_convert_all_columns_to_utf8.R ... ✅
+   🔄 Loading: fn_make_names.R ... ✅
+   🔄 Loading: Time_Recode.R ... ✅
+   🔄 Loading: 212g_process_address_and_time_officialwebsite_sales.R ... ✅
+   🔄 Loading: 213g_process_promotion_recoding_officialwebsite.R ... ✅
+   🔄 Loading: 300g_import_website_km_sales.R ... ✅
+   🔄 Loading: CopyOf211g_process_address_and_time_officialwebsite_sales.R ... ✅
+   ✅ Completed directory: 05_etl_utils 
+
+📁 Loading directory: 06_queries 
+   📋 Found 9 R files
+   🔄 Loading: 300g_query_product_property_comeptitors.R ... ✅
+   🔄 Loading: 301g_query_product_property_dictionary_km.R ... ✅
+   🔄 Loading: 302g_query_comment_property_rating.R ... ✅
+   🔄 Loading: 303g_query_comment_property_ratingonly_by_asin.R ... ✅
+   🔄 Loading: 304g_query_promotion_codebook.R ... ✅
+   🔄 Loading: 305g_query_find_nes_median.R ... ✅
+   🔄 Loading: 306g_query_sales_by_time_state.R ... ✅
+   🔄 Loading: 307g_query_sales_by_time_zip.R ... ✅
+   🔄 Loading: 308g_query_nes_trend.R ... ✅
+   ✅ Completed directory: 06_queries 
+
+⏭️  Skipping non-existent directory: 05_data_processing 
+📁 Loading directory: 07_models 
+   📋 Found 15 R files
+   🔄 Loading: choice_model_lik.R ...
+載入套件：‘EnvStats’
+
+下列物件被遮斷自 ‘package:stats’:
+
+    predict, predict.lm
+
+下列物件被遮斷自 ‘package:base’:
+
+    print.default
+
+
+載入套件：‘Matrix’
+
+下列物件被遮斷自 ‘package:tidyr’:
+
+    expand, pack, unpack
+
+載入需要的套件：miscTools
+
+Please cite the 'maxLik' package as:
+Henningsen, Arne and Toomet, Ott (2011). maxLik: A package for maximum likelihood estimation in R. Computational Statistics 26(3), 443-458. DOI 10.1007/s00180-010-0217-1.
+
+If you have questions, suggestions, or comments regarding the 'maxLik' package, please use a forum or 'tracker' at maxLik's R-Forge site:
+https://r-forge.r-project.org/projects/maxlik/
+
+載入套件：‘pracma’
+
+下列物件被遮斷自 ‘package:maxLik’:
+
+    gradient, hessian
+
+下列物件被遮斷自 ‘package:Matrix’:
+
+    expm, lu, tril, triu
+
+下列物件被遮斷自 ‘package:hash’:
+
+    clear
+
+下列物件被遮斷自 ‘package:lares’:
+
+    tic, toc
+
+下列物件被遮斷自 ‘package:psych’:
+
+    logit, polar
+
+下列物件被遮斷自 ‘package:purrr’:
+
+    cross
+
+下列物件被遮斷自 ‘package:arrow’:
+
+    null
+
+
+載入套件：‘fastmatch’
+
+下列物件被遮斷自 ‘package:dplyr’:
+
+    coalesce
+
+ ✅
+   🔄 Loading: choice_model_optimization.R ... ✅
+   🔄 Loading: Design_gen.R ... ✅
+   🔄 Loading: Design_matrix_Generation_Poisson.R ... ✅
+   🔄 Loading: Design_matrix_Generation_Poisson2.R ... ✅
+   🔄 Loading: ladder.R ... ✅
+   🔄 Loading: Optimal Pricing.R ... ✅
+   🔄 Loading: Poisson_Regression_InsightForge.R ... ✅
+   🔄 Loading: Poisson_Regression.R ... ✅
+   🔄 Loading: SGD.R ... ✅
+   🔄 Loading: SGD2.R ... ✅
+   🔄 Loading: Sort_Optimal_Pricing_Forluma.R ...Sales ~ month_1 + 客戶服務 + month_5 + month_6 + month_7 + RatingNum + month_8 + month_9 + month_10 + year + Charging_type_4 + 星期二 + 星期一 + 星期三 + Revenue + 星期四 + 星期六 + is_pre7day_holiday + 材質_不鏽鋼 + Rating + 顏色_白 + AmazonReviewRating + 顏色_綠 + 顏色_海軍藍 + month_12 + 是否可開多種罐型_4.5 + 是否有保固 + logprice + 顏色_橘:logprice + month_1:logprice + month_2:logprice + month_4:logprice + month_5:logprice + month_6:logprice + month_7:logprice + 可靠性:logprice + month_8:logprice + month_9:logprice + month_10:logprice + month_11:logprice + month_12:logprice + year:logprice + 星期一:logprice + 星期二:logprice + 星期日:logprice + 星期三:logprice + 星期四:logprice + is_pre7day_holiday:logprice + 星期五:logprice + logprice2 + month_1:logprice2 + month_2:logprice2 + month_3:logprice2 + month_4:logprice2 + month_5:logprice2 + month_6:logprice2 + month_7:logprice2 + month_8:logprice2 + month_9:logprice2 + month_10:logprice2 + month_11:logprice2 + year:logprice2 + 星期日:logprice2 ✅
+   🔄 Loading: stepwise_selection2.R ... ✅
+   🔄 Loading: stepwise_selection3.R ... ✅
+   🔄 Loading: Stepwise.R ... ✅
+   ✅ Completed directory: 07_models 
+
+📁 Loading directory: 08_ai 
+   📋 Found 10 R files
+   🔄 Loading: 510g_setup_python.R ... ✅
+   🔄 Loading: 601g_ai_review_rating.R ... ✅
+   🔄 Loading: 603g_ai_review_ratings_estimate.R ... ✅
+   🔄 Loading: 701g_decode_ai_review_ratings.R ... ✅
+   🔄 Loading: fn_chat_api.R ... ✅
+   🔄 Loading: fn_decode_rating.R ... ✅
+   🔄 Loading: fn_process_property_ratings.R ... ✅
+   🔄 Loading: fn_process_review_ratings.R ... ✅
+   🔄 Loading: fn_rate_comments.R ... ✅
+   🔄 Loading: fn_strip_code_fence.R ... ✅
+   ✅ Completed directory: 08_ai 
+
+📁 Loading directory: 09_python_scripts 
+   ℹ️  No R files found in 09_python_scripts 
+📁 Loading directory: 10_rshinyapp_components 
+   📋 Found 59 R files
+   🔄 Loading: common.R ... ✅
+   🔄 Loading: login_module.R ... ✅
+   🔄 Loading: fn_create_kpi_box.R ... ✅
+   🔄 Loading: macro_overview.R ... ✅
+   🔄 Loading: macroNESTransition.R ... ✅
+   🔄 Loading: macroTrend.R ... ✅
+   🔄 Loading: server_macro_overview.R ... ✅
+   🔄 Loading: server_macro_trends.R ... ✅
+   🔄 Loading: ui_macro_overview.R ... ✅
+   🔄 Loading: ui_macro_trends.R ... ✅
+   🔄 Loading: campaign_analysis.R ... ✅
+   🔄 Loading: sales_analysis.R ... ✅
+   🔄 Loading: target_profiling.R ... ✅
+   🔄 Loading: microCustomer2.R ... ✅
+   🔄 Loading: microDNADistribution.R ... ✅
+   🔄 Loading: microMacroKPI.R ... ✅
+   🔄 Loading: microTransactionsDefaults.R ... ✅
+   🔄 Loading: microTransactionsServer.R ... ✅
+   🔄 Loading: microTransactionsUI.R ... ✅
+   🔄 Loading: passwordOnlyDefaults.R ... ✅
+   🔄 Loading: passwordOnlyServer.R ... ✅
+   🔄 Loading: passwordOnlyUI.R ... ✅
+   🔄 Loading: poissonCommentAnalysis.R ... ✅
+   🔄 Loading: poissonFeatureAnalysis.R ... ✅
+   🔄 Loading: poissonTimeAnalysis.R ... ✅
+   🔄 Loading: positionDNAPlotly.R ... ✅
+   🔄 Loading: positionIdealRate.R ... ✅
+   🔄 Loading: positionKFE.R ... ✅
+   🔄 Loading: positionMSPlotly.R ... ✅
+   🔄 Loading: positionStrategy.R ... ✅
+   🔄 Loading: positionTable.R ... ✅
+   🔄 Loading: sidebarCommonDefaults.R ... ✅
+   🔄 Loading: sidebarCommonFilters.R ... ✅
+   🔄 Loading: sidebarCommonServer.R ... ✅
+   🔄 Loading: sidebarCommonUI.R ... ✅
+   🔄 Loading: sidebarFactoryDefaults.R ... ✅
+   🔄 Loading: sidebarFactoryServer.R ... ✅
+   🔄 Loading: sidebarFactoryUI.R ... ✅
+   🔄 Loading: sidebarHybridDefaults.R ... ✅
+   🔄 Loading: sidebarHybridServer.R ... ✅
+   🔄 Loading: sidebarHybridUI.R ... ✅
+   🔄 Loading: sidebarMacroDefaults.R ... ✅
+   🔄 Loading: sidebarMacroServer.R ... ✅
+   🔄 Loading: sidebarMacroUI.R ... ✅
+   🔄 Loading: sidebarMainDefaults.R ... ✅
+   🔄 Loading: sidebarMainServer.R ... ✅
+   🔄 Loading: sidebarMainUI.R ... ✅
+   🔄 Loading: sidebarMicroDefaults.R ... ✅
+   🔄 Loading: sidebarMicroServer.R ... ✅
+   🔄 Loading: sidebarMicroUI.R ... ✅
+   🔄 Loading: sidebarTargetDefaults.R ... ✅
+   🔄 Loading: sidebarTargetServer.R ... ✅
+   🔄 Loading: sidebarTargetUI.R ... ✅
+   🔄 Loading: sidebarUnionDefaults.R ... ✅
+   🔄 Loading: sidebarUnionFilters.R ... ✅
+   🔄 Loading: sidebarUnionServer.R ... ✅
+   🔄 Loading: sidebarUnionUI.R ... ✅
+   🔄 Loading: server_target_segmentation.R ... ✅
+   🔄 Loading: ui_target_segmentation.R ... ✅
+   ✅ Completed directory: 10_rshinyapp_components 
+
+📁 Loading directory: 11_rshinyapp_utils 
+   📋 Found 29 R files
+   🔄 Loading: clean_column_names_remove_english.R ... ✅
+   🔄 Loading: CreateChoices.R ... ✅
+   🔄 Loading: fn_access_processing_data.R ... ✅
+   🔄 Loading: fn_build_app_from_config.R ... ✅
+   🔄 Loading: fn_check_data_access.R ... ✅
+   🔄 Loading: fn_get_data_for_table.R ... ✅
+   🔄 Loading: fn_get_position_complete_case.R ... ✅
+   🔄 Loading: fn_process_data_source.R ... ✅
+   🔄 Loading: fn_read_from_app_data.R ... ✅
+   🔄 Loading: fn_read_yaml_config.R ... ✅
+   🔄 Loading: fn_renderUI2.R ... ✅
+   🔄 Loading: fn_safe_value.R ... ✅
+   🔄 Loading: formattime.R ... ✅
+   🔄 Loading: clean_column_names_remove_english.R ... ✅
+   🔄 Loading: CreateChoices.R ... ✅
+   🔄 Loading: formattime.R ... ✅
+   🔄 Loading: getDynamicOptions.R ... ✅
+   🔄 Loading: process_sales_data.R ... ✅
+   🔄 Loading: Recode_time_TraceBack.R ... ✅
+   🔄 Loading: remove_elements.R ... ✅
+   🔄 Loading: safe_get.R ... ✅
+   🔄 Loading: getDynamicOptions.R ... ✅
+   🔄 Loading: helpers.R ... ✅
+   🔄 Loading: load_position_functions.R ...🔄 Loading Position Table Access Functions...
+✅ fn_get_position_complete_case already available
+✅ fn_get_position_demonstrate_case already available
+🎯 Position Table Access Functions ready for use!
+
+📋 Available functions:
+   • fn_get_position_complete_case() - for modules needing Ideal/Rating/Revenue rows
+   • fn_get_position_demonstrate_case() - for modules showing only market data
+
+🔍 Both functions support type filtering to show only '屬性' columns
+ ✅
+   🔄 Loading: process_sales_data.R ... ✅
+   🔄 Loading: Recode_time_TraceBack.R ... ✅
+   🔄 Loading: remove_elements.R ... ✅
+   🔄 Loading: safe_get.R ... ✅
+   🔄 Loading: safe_type_operations.R ... ✅
+   ✅ Completed directory: 11_rshinyapp_utils 
+
+📁 Loading directory: 17_transform 
+   📋 Found 2 R files
+   🔄 Loading: fn_transform_sales_by_customer.by_date_to_sales_by_customer.R ... ✅
+   🔄 Loading: fn_transform_sales_to_sales_by_customer.by_date.R ... ✅
+   ✅ Completed directory: 17_transform 
+
+📊 Loading Summary:
+   ✅ Successfully loaded: 330 files
+   ❌ Failed to load: 0 files
+🎯 Global scripts loading completed!
+
+UPDATE_MODE initialization finished. Databases available: app_data, raw_data, staged_data, cleansed_data, transformed_data, processed_data, meta_data, comment_property_rating, comment_property_rating_temp, comment_property_rating_results
+DEBUG: ✅ autoinit() completed successfully
+DEBUG: Loading required libraries...
+DEBUG: Loading DBI...
+DEBUG: ✅ DBI loaded
+DEBUG: Loading duckdb...
+DEBUG: ✅ duckdb loaded
+DEBUG: Loading dplyr...
+DEBUG: ✅ dplyr loaded
+DEBUG: Loading lubridate...
+DEBUG: ✅ lubridate loaded
+DEBUG: Loading stringr...
+DEBUG: ✅ stringr loaded
+DEBUG: Sourcing database connection functions...
+DEBUG: ✅ Sourced fn_dbConnectDuckdb.R
+DEBUG: [OK] Global initialization complete
+DEBUG: Script: eby_ETL_order_details_1ST___MAMBA_DEBUG v2.0.0-DEBUG
+DEBUG: Following MP064 ETL-Derivation Separation
+DEBUG: Following MP104 ETL Data Flow Separation
+DEBUG: Establishing database connections...
+DEBUG: Database paths:
+DEBUG: raw_data: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/data/local_data/raw_data.duckdb
+DEBUG: staged_data: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/data/local_data/staged_data.duckdb
+DEBUG: ✅ Raw data database file exists
+DEBUG: Connecting to raw_data database...
+DEBUG: ✅ Connected to raw_data database
+DEBUG: Tables in raw_data: df_all_comment_property, df_all_item_profile_alf, df_all_item_profile_irf, df_all_item_profile_pre, df_all_item_profile_rek, df_all_item_profile_tur, df_all_item_profile_wak, df_cbz_customers___raw, df_cbz_orders___raw, df_cbz_products___raw, df_cbz_sales___raw, df_eby_competitor_item_id, df_eby_order_details___raw___MAMBA, df_eby_orders___raw___MAMBA, df_eby_review, df_eby_sales___raw
+DEBUG: Connecting to staged_data database...
+DEBUG: ❌ Failed to connect to staged_data: DuckDB 連線失敗：rapi_startup: Failed to open database: {"exception_type":"IO","exception_message":"Could not set lock on file \"/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/data/local_data/staged_data.duckdb\": Conflicting lock is held in /Applications/RStudio.app/Contents/Resources/app/bin/rsession-arm64 (PID 82684) by user che. See also https://duckdb.org/docs/stable/connect/concurrency","errno":"35"}
+路徑：/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/data/local_data/staged_data.duckdb
+模式：可寫
+錯誤發生在 value[[3L]](cond)： 
+  DuckDB 連線失敗：rapi_startup: Failed to open database: {"exception_type":"IO","exception_message":"Could not set lock on file \"/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/data/local_data/staged_data.duckdb\": Conflicting lock is held in /Applications/RStudio.app/Contents/Resources/app/bin/rsession-arm64 (PID 82684) by user che. See also https://duckdb.org/docs/stable/connect/concurrency","errno":"35"}
+路徑：/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/data/local_data/staged_data.duckdb
+模式：可寫
+呼叫： tryCatch -> tryCatchList -> tryCatchOne -> <Anonymous>
+❌ FATAL ERROR OCCURRED
+Error message: 錯誤發生在 value[[3L]](cond)： 
+  DuckDB 連線失敗：rapi_startup: Failed to open database: {"exception_type":"IO","exception_message":"Could not set lock on file \"/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/data/local_data/staged_data.duckdb\": Conflicting lock is held in /Applications/RStudio.app/Contents/Resources/app/bin/rsession-arm64 (PID 82684) by user che. See also https://duckdb.org/docs/stable/connect/concurrency","errno":"35"}
+路徑：/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA/data/local_data/staged_data.duckdb
+模式：可寫
+呼叫： tryCatch -> tryCatchList -> tryCatchOne -> <Anonymous>
+
+無 traceback 
+DEBUG: ✅ All database connections established
+DEBUG: Starting MAIN processing...
+DEBUG: Reading raw BAYORE data...
+DEBUG: ✅ Table df_eby_order_details___raw___MAMBA exists
+DEBUG: Getting table schema...
+DEBUG: Table has 14 columns
+  Column 1: ORE001 (INTEGER)
+  Column 2: ORE002 (VARCHAR)
+  Column 3: ORE003 (VARCHAR)
+  Column 4: ORE004 (VARCHAR)
+  Column 5: ORE005 (VARCHAR)
+  ... and 9 more columns
+DEBUG: Checking row count...
+DEBUG: Table has 181399 rows
+DEBUG: Reading 181399 rows from df_eby_order_details___raw___MAMBA...
+DEBUG: ✅ Read completed in 0.44 seconds
+DEBUG: Loaded 181399 raw order details
+DEBUG: Standardizing column names...
+DEBUG: Found 14 columns in raw data
+DEBUG: Column names:
+  - ORE001
+  - ORE002
+  - ORE003
+  - ORE004
+  - ORE005
+  - ORE006
+  - ORE007
+  - ORE008
+  - ORE009
+  - ORE010
+  - ORE011
+  - ORE012
+  - ORE013
+  - ORE014
+DEBUG: Will rename 14 columns
+DEBUG: Rename mapping:
+  ORE001 -> order_id
+  ORE002 -> line_item_number
+  ORE003 -> ebay_item_code
+  ORE004 -> product_name
+  ORE005 -> erp_product_no
+  ORE006 -> application_data
+  ORE007 -> condition
+  ORE008 -> quantity
+  ORE009 -> unit_price
+  ORE010 -> listing_country
+  ORE011 -> email
+  ORE012 -> static_alias
+  ORE013 -> batch_key
+  ORE014 -> reserved_field
+DEBUG: Performing column rename...
+DEBUG: ✅ Rename completed in 0.00 seconds
+DEBUG: Columns after rename (14):
+  - order_id
+  - line_item_number
+  - ebay_item_code
+  - product_name
+  - erp_product_no
+  - application_data
+  - condition
+  - quantity
+  - unit_price
+  - listing_country
+  ... and 4 more columns
+DEBUG: Converting data types and cleaning...
+DEBUG: Applying data type conversions...
+DEBUG: ✅ Basic conversions completed
+DEBUG: Converting batch_key encoding...
+DEBUG: ✅ batch_key encoding converted
+DEBUG: Cleaning 6 text fields...
+DEBUG: ✅ Text fields cleaned
+DEBUG: Standardizing condition field...
+DEBUG: Calculating line_total from quantity * unit_price...
+DEBUG: ✅ line_total calculated
+DEBUG: ✅ All conversions completed in 0.57 seconds
+DEBUG: Processed 17 columns
+DEBUG: Performing data quality checks...
+DEBUG: Checking for duplicate line items...
+DEBUG: ⚠️ Found 161091 duplicate line items
+DEBUG: Removed duplicates
+DEBUG: Checking for missing values in critical fields...
+DEBUG: Missing order_ids: 0
+DEBUG: Missing line_item_numbers: 0
+DEBUG: Missing batch_keys: 0 (critical for JOIN)
+DEBUG: ✅ No negative quantities
+DEBUG: ✅ No negative prices
+DEBUG: Available expected columns: 6/6
+DEBUG: Storing staged BAYORE data...
+DEBUG: ❌ Error during order details staging: 在為 'dbExistsTable' 函式選擇方法時評估 'conn' 引數發生錯誤: 找不到物件 'staged_data'
+DEBUG: Traceback:
+5: stop(e)
+4: value[[3L]](cond)
+3: tryCatchOne(expr, names, parentenv, handlers[[1L]])
+2: tryCatchList(expr, classes, parentenv, handlers)
+1: tryCatch({
+       staged_data <- dbConnectDuckdb(db_path_list$staged_data, 
+           read_only = FALSE)
+       message("DEBUG: ✅ Connected to staged_data database")
+       staged_tables <- dbListTables(staged_data)
+       message(sprintf("DEBUG: Tables in staged_data: %s", if (length(staged_tables) > 
+           0) 
+           paste(staged_tables, collapse = ", ")
+       else "none"))
+   }, error = function(e) {
+       message(sprintf("DEBUG: ❌ Failed to connect to staged_data: %s", 
+           e$message))
+       stop(e)
+   })
+錯誤發生在 h(simpleError(msg, call))： 
+  在為 'dbExistsTable' 函式選擇方法時評估 'conn' 引數發生錯誤: 找不到物件 'staged_data'
+呼叫： tryCatch -> tryCatchList -> tryCatchOne -> <Anonymous>
+❌ FATAL ERROR OCCURRED
+Error message: 錯誤發生在 h(simpleError(msg, call))： 
+  在為 'dbExistsTable' 函式選擇方法時評估 'conn' 引數發生錯誤: 找不到物件 'staged_data'
+呼叫： tryCatch -> tryCatchList -> tryCatchOne -> <Anonymous>
+
+5: stop(e)
+4: value[[3L]](cond)
+3: tryCatchOne(expr, names, parentenv, handlers[[1L]])
+2: tryCatchList(expr, classes, parentenv, handlers)
+1: tryCatch({
+       staged_data <- dbConnectDuckdb(db_path_list$staged_data, 
+           read_only = FALSE)
+       message("DEBUG: ✅ Connected to staged_data database")
+       staged_tables <- dbListTables(staged_data)
+       message(sprintf("DEBUG: Tables in staged_data: %s", if (length(staged_tables) > 
+           0) 
+           paste(staged_tables, collapse = ", ")
+       else "none"))
+   }, error = function(e) {
+       message(sprintf("DEBUG: ❌ Failed to connect to staged_data: %s", 
+           e$message))
+       stop(e)
+   })
+DEBUG: Starting validation tests...
+DEBUG: Test 1 - Checking if staged table exists...
+DEBUG: ❌ Test failed: 在為 'dbExistsTable' 函式選擇方法時評估 'conn' 引數發生錯誤: 找不到物件 'staged_data'
+錯誤發生在 h(simpleError(msg, call))： 
+  在為 'dbExistsTable' 函式選擇方法時評估 'conn' 引數發生錯誤: 找不到物件 'staged_data'
+呼叫： tryCatch -> tryCatchList -> tryCatchOne -> <Anonymous>
+❌ FATAL ERROR OCCURRED
+Error message: 錯誤發生在 h(simpleError(msg, call))： 
+  在為 'dbExistsTable' 函式選擇方法時評估 'conn' 引數發生錯誤: 找不到物件 'staged_data'
+呼叫： tryCatch -> tryCatchList -> tryCatchOne -> <Anonymous>
+
+5: stop(e)
+4: value[[3L]](cond)
+3: tryCatchOne(expr, names, parentenv, handlers[[1L]])
+2: tryCatchList(expr, classes, parentenv, handlers)
+1: tryCatch({
+       message("DEBUG: Reading raw BAYORE data...")
+       raw_table_name <- "df_eby_order_details___raw___MAMBA"
+       if (!dbExistsTable(raw_data, raw_table_name)) {
+           message(sprintf("DEBUG: ❌ Table %s does not exist in raw_data", 
+               raw_table_name))
+           message("DEBUG: Available tables in raw_data:")
+           for (tbl in dbListTables(raw_data)) {
+               message(sprintf("  - %s", tbl))
+           }
+           stop(sprintf("Required table %s not found", raw_table_name))
+       }
+       message(sprintf("DEBUG: ✅ Table %s exists", raw_table_name))
+       message("DEBUG: Getting table schema...")
+       tryCatch({
+           table_info <- dbGetQuery(raw_data, sprintf("PRAGMA table_info('%s')", 
+               raw_table_name))
+           message(sprintf("DEBUG: Table has %d columns", nrow(table_info)))
+           for (i in 1:min(5, nrow(table_info))) {
+               message(sprintf("  Column %d: %s (%s)", i, table_info$name[i], 
+                   table_info$type[i]))
+           }
+           if (nrow(table_info) > 5) {
+               message(sprintf("  ... and %d more columns", nrow(table_info) - 
+                   5))
+           }
+       }, error = function(e) {
+           message("DEBUG: Could not get table schema info")
+       })
+       message("DEBUG: Checking row count...")
+       row_count_query <- sprintf("SELECT COUNT(*) as n FROM %s", 
+           raw_table_name)
+       raw_count <- dbGetQuery(raw_data, row_count_query)$n
+       message(sprintf("DEBUG: Table has %d rows", raw_count))
+       if (raw_count == 0) {
+           message("DEBUG: ⚠️ Table is empty, nothing to process")
+           stop("No data to process")
+       }
+       message(sprintf("DEBUG: Reading %d rows from %s...", raw_count, 
+           raw_table_name))
+       read_start <- Sys.time()
+       raw_details <- dbReadTable(raw_data, raw_table_name)
+       read_elapsed <- difftime(Sys.time(), read_start, units = "secs")
+       message(sprintf("DEBUG: ✅ Read completed in %.2f seconds", 
+           read_elapsed))
+       n_raw <- nrow(raw_details)
+       message(sprintf("DEBUG: Loaded %d raw order details", n_raw))
+       message("DEBUG: Standardizing column names...")
+       existing_columns <- names(raw_details)
+       message(sprintf("DEBUG: Found %d columns in raw data", length(existing_columns)))
+       message("DEBUG: Column names:")
+       for (col in existing_columns) {
+           message(sprintf("  - %s", col))
+       }
+       column_mapping <- list(ORE001 = "order_id", ORE002 = "line_item_number", 
+           ORE003 = "ebay_item_code", ORE004 = "product_name", ORE005 = "erp_product_no", 
+           ORE006 = "application_data", ORE007 = "condition", ORE008 = "quantity", 
+           ORE009 = "unit_price", ORE010 = "listing_country", ORE011 = "email", 
+           ORE012 = "static_alias", ORE013 = "batch_key", ORE014 = "reserved_field")
+       columns_to_rename <- column_mapping[names(column_mapping) %in% 
+           existing_columns]
+       if (length(columns_to_rename) == 0) {
+           message("DEBUG: ❌ No recognized BAYORE columns found in raw data")
+           message("DEBUG: Expected columns starting with ORE, found:")
+           ore_cols <- grep("^ORE", existing_columns, value = TRUE)
+           if (length(ore_cols) > 0) {
+               for (col in ore_cols) {
+                   message(sprintf("  - %s", col))
+               }
+           }
+           else {
+               message("  None")
+           }
+           stop("No recognized BAYORE columns found in raw data")
+       }
+       message(sprintf("DEBUG: Will rename %d columns", length(columns_to_rename)))
+       message("DEBUG: Rename mapping:")
+       for (old_name in names(columns_to_rename)) {
+           message(sprintf("  %s -> %s", old_name, columns_to_rename[[old_name]]))
+       }
+       critical_columns <- c("ORE001", "ORE002", "ORE004", "ORE013")
+       missing_critical <- setdiff(critical_columns, names(columns_to_rename))
+       if (length(missing_critical) > 0) {
+           message(sprintf("DEBUG: ⚠️ Missing critical columns: %s", 
+               paste(missing_critical, collapse = ", ")))
+       }
+       message("DEBUG: Performing column rename...")
+       rename_start <- Sys.time()
+       rename_args <- setNames(names(columns_to_rename), unlist(columns_to_rename))
+       tryCatch({
+           staged_details <- raw_details %>% rename(!!!rename_args)
+           rename_elapsed <- difftime(Sys.time(), rename_start, 
+               units = "secs")
+           message(sprintf("DEBUG: ✅ Rename completed in %.2f seconds", 
+               rename_elapsed))
+           new_columns <- names(staged_details)
+           message(sprintf("DEBUG: Columns after rename (%d):", 
+               length(new_columns)))
+           for (i in 1:min(10, length(new_columns))) {
+               message(sprintf("  - %s", new_columns[i]))
+           }
+           if (length(new_columns) > 10) {
+               message(sprintf("  ... and %d more columns", length(new_columns) - 
+                   10))
+           }
+       }, error = function(e) {
+           message(sprintf("DEBUG: ❌ Rename failed: %s", e$message))
+           message("DEBUG: Attempting alternative rename method...")
+           staged_details <- raw_details
+           for (old_name in names(columns_to_rename)) {
+               new_name <- columns_to_rename[[old_name]]
+               if (old_name %in% names(staged_details)) {
+                   names(staged_details)[names(staged_details) == 
+                     old_name] <- new_name
+                   message(sprintf("DEBUG: Renamed %s to %s", old_name, 
+                     new_name))
+               }
+           }
+       })
+       message("DEBUG: Converting data types and cleaning...")
+       staged_columns <- names(staged_details)
+       message("DEBUG: Applying data type conversions...")
+       conversion_start <- Sys.time()
+       staged_details <- staged_details %>% mutate(across(any_of(c("quantity")), 
+           ~as.integer(.)), across(any_of(c("unit_price")), ~as.numeric(.)), 
+           across(any_of(c("listing_country")), ~as.integer(.)), 
+           staged_timestamp = Sys.time(), staging_version = script_version)
+       message("DEBUG: ✅ Basic conversions completed")
+       if ("batch_key" %in% staged_columns) {
+           message("DEBUG: Converting batch_key encoding...")
+           staged_details <- staged_details %>% mutate(batch_key = iconv(batch_key, 
+               from = "latin1", to = "UTF-8", sub = ""))
+           message("DEBUG: ✅ batch_key encoding converted")
+       }
+       text_fields_to_clean <- intersect(c("product_name", "erp_product_no", 
+           "application_data", "condition", "email", "static_alias"), 
+           staged_columns)
+       if (length(text_fields_to_clean) > 0) {
+           message(sprintf("DEBUG: Cleaning %d text fields...", 
+               length(text_fields_to_clean)))
+           staged_details <- staged_details %>% mutate(across(all_of(text_fields_to_clean), 
+               str_trim))
+           message("DEBUG: ✅ Text fields cleaned")
+       }
+       if ("condition" %in% staged_columns) {
+           message("DEBUG: Standardizing condition field...")
+           staged_details <- staged_details %>% mutate(condition = str_trim(condition))
+       }
+       if (all(c("quantity", "unit_price") %in% staged_columns)) {
+           message("DEBUG: Calculating line_total from quantity * unit_price...")
+           staged_details <- staged_details %>% mutate(line_total = quantity * 
+               unit_price)
+           message("DEBUG: ✅ line_total calculated")
+       }
+       conversion_elapsed <- difftime(Sys.time(), conversion_start, 
+           units = "secs")
+       message(sprintf("DEBUG: ✅ All conversions completed in %.2f seconds", 
+           conversion_elapsed))
+       message(sprintf("DEBUG: Processed %d columns", ncol(staged_details)))
+       message("DEBUG: Performing data quality checks...")
+       staged_columns <- names(staged_details)
+       if (all(c("order_id", "line_item_number") %in% staged_columns)) {
+           message("DEBUG: Checking for duplicate line items...")
+           n_duplicates <- staged_details %>% group_by(order_id, 
+               line_item_number) %>% filter(n() > 1) %>% nrow()
+           if (n_duplicates > 0) {
+               message(sprintf("DEBUG: ⚠️ Found %d duplicate line items", 
+                   n_duplicates))
+               staged_details <- staged_details %>% group_by(order_id, 
+                   line_item_number) %>% slice(1) %>% ungroup()
+               message("DEBUG: Removed duplicates")
+           }
+           else {
+               message("DEBUG: ✅ No duplicate line items found")
+           }
+       }
+       message("DEBUG: Checking for missing values in critical fields...")
+       if ("order_id" %in% staged_columns) {
+           missing_order_ids <- sum(is.na(staged_details$order_id))
+           message(sprintf("DEBUG: Missing order_ids: %d", missing_order_ids))
+       }
+       if ("line_item_number" %in% staged_columns) {
+           missing_line_items <- sum(is.na(staged_details$line_item_number))
+           message(sprintf("DEBUG: Missing line_item_numbers: %d", 
+               missing_line_items))
+       }
+       if ("batch_key" %in% staged_columns) {
+           missing_batch <- sum(is.na(staged_details$batch_key))
+           message(sprintf("DEBUG: Missing batch_keys: %d (critical for JOIN)", 
+               missing_batch))
+       }
+       else {
+           message("DEBUG: ⚠️ batch_key column not present - JOINs with orders may fail")
+       }
+       if ("quantity" %in% staged_columns) {
+           negative_quantities <- sum(staged_details$quantity < 
+               0, na.rm = TRUE)
+           if (negative_quantities > 0) {
+               message(sprintf("DEBUG: ⚠️ Found %d negative quantities", 
+                   negative_quantities))
+           }
+           else {
+               message("DEBUG: ✅ No negative quantities")
+           }
+       }
+       if ("unit_price" %in% staged_columns) {
+           negative_prices <- sum(staged_details$unit_price < 0, 
+               na.rm = TRUE)
+           if (negative_prices > 0) {
+               message(sprintf("DEBUG: ⚠️ Found %d negative prices", 
+                   negative_prices))
+           }
+           else {
+               message("DEBUG: ✅ No negative prices")
+           }
+       }
+       expected_columns <- c("order_id", "line_item_number", "batch_key", 
+           "product_name", "quantity", "unit_price")
+       available_expected <- intersect(expected_columns, staged_columns)
+       missing_expected <- setdiff(expected_columns, staged_columns)
+       message(sprintf("DEBUG: Available expected columns: %d/%d", 
+           length(available_expected), length(expected_columns)))
+       if (length(missing_expected) > 0) {
+           message(sprintf("DEBUG: Missing expected columns: %s", 
+               paste(missing_expected, collapse = ", ")))
+       }
+       message("DEBUG: Storing staged BAYORE data...")
+       table_name <- "df_eby_order_details___staged___MAMBA"
+       if (dbExistsTable(staged_data, table_name)) {
+           message(sprintf("DEBUG: Dropping existing table: %s", 
+               table_name))
+           dbRemoveTable(staged_data, table_name)
+           message(sprintf("DEBUG: ✅ Dropped existing table: %s", 
+               table_name))
+       }
+       message(sprintf("DEBUG: Writing %d rows to %s...", nrow(staged_details), 
+           table_name))
+       write_start <- Sys.time()
+       tryCatch({
+           dbWriteTable(staged_data, table_name, staged_details)
+           write_elapsed <- difftime(Sys.time(), write_start, units = "secs")
+           message(sprintf("DEBUG: ✅ Write completed in %.2f seconds", 
+               write_elapsed))
+       }, error = function(e) {
+           message(sprintf("DEBUG: ❌ Failed to write table: %s", 
+               e$message))
+           stop(e)
+       })
+       n_staged <- nrow(staged_details)
+       message(sprintf("DEBUG: ✅ Stored %d staged order details in %s", 
+           n_staged, table_name))
+       message("DEBUG: Preparing sample data for display...")
+       sample_data <- head(staged_details, 3)
+       display_cols <- intersect(c("order_id", "line_item_number", 
+           "batch_key", "product_name", "quantity", "unit_price"), 
+           names(sample_data))
+       if (length(display_cols) > 0) {
+           message("DEBUG: Sample of staged BAYORE data:")
+           print(sample_data[, display_cols])
+       }
+       else {
+           message("DEBUG: Sample data (first 5 columns):")
+           print(sample_data[, 1:min(5, ncol(sample_data))])
+       }
+       main_elapsed <- round(difftime(Sys.time(), main_start_time, 
+           units = "secs"), 2)
+       message(sprintf("DEBUG: ✅ Order details staging completed in %.2f seconds", 
+           main_elapsed))
+   }, error = function(e) {
+       message(sprintf("DEBUG: ❌ Error during order details staging: %s", 
+           e$message))
+       message("DEBUG: Traceback:")
+       traceback()
+       stop(e)
+   })
+DEBUG: Starting cleanup...
+DEBUG: ✅ Disconnected from raw_data
+DEBUG: Total execution time: 7.51 seconds
+DEBUG: Completed at: 2025-08-31 14:16:47.278629
+DEBUG: Executing final cleanup with autodeinit()...
+Scanning 747 objects for DBI connections...
+No DBI connections found in global environment
+>> De-init completed ‒ GlobalEnv 已清空並重建薄殼

@@ -154,14 +154,18 @@ process_position_table <- function(product_line_id,
   }
   
   # 5. Integrate data
-  combined_position <- dplyr::tbl(raw_data, competitor_table) %>% 
-    dplyr::collect() %>% 
-    dplyr::filter(product_line_id == !!product_line_id) %>% 
-    dplyr::select(brand, !!sym(product_col)) %>% 
-    dplyr::left_join(Dta, by = product_col) %>% 
-    dplyr::left_join(cl_used_sales, by = product_col) %>% 
-    dplyr::mutate(brand = dplyr::na_if(brand, NA_character_) %>% 
-                   tidyr::replace_na("UNKNOWN"))
+  combined_position <- dplyr::tbl(raw_data, competitor_table) %>%
+    dplyr::collect() %>%
+    dplyr::filter(product_line_id == !!product_line_id) %>%
+    dplyr::select(brand, !!sym(product_col)) %>%
+    dplyr::left_join(Dta, by = product_col) %>%
+    dplyr::left_join(cl_used_sales, by = product_col) %>%
+    dplyr::mutate(
+      # Fix ISSUE_113: Convert empty strings to NA first (MP114 - input validation)
+      brand = dplyr::na_if(brand, ""),
+      # Then handle NA values
+      brand = tidyr::replace_na(brand, "UNKNOWN")
+    )
   
   # 6. Calculate ideal values
   ideal_data <- calculate_ideal_values(combined_position, product_col = product_col)

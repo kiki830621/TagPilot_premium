@@ -1120,7 +1120,7 @@ microCustomerInitialize <- function(id, app_data_connection = NULL, config = NUL
 ####initServerSideSelectize####
 
 # 新增的服務器端函數，負責處理 selectize 的選項
-initServerSideSelectize <- function(session, inputId, df, labelFields, valueField, maxproducts = 1000) {
+initServerSideSelectize <- function(session, inputId, df, labelFields, valueField, maxItems = 1000) {
   # 設置服務器端 selectize 搜索處理函數
   session$sendCustomMessage("updateSelectizeInput", list(
     inputId = session$ns(inputId),
@@ -1130,7 +1130,7 @@ initServerSideSelectize <- function(session, inputId, df, labelFields, valueFiel
           if (!query.length) return callback();
           Shiny.setInputValue('", 
         session$ns(paste0(inputId, "_search")),
-        "', {query: query, product_count: ", maxproducts, "}, {priority: 'event'});
+        "', {query: query, item_count: ", maxItems, "}, {priority: 'event'});
         }"
       ))
     )
@@ -1142,7 +1142,7 @@ initServerSideSelectize <- function(session, inputId, df, labelFields, valueFiel
     }
     
     query <- input[[paste0(inputId, "_search")]]$query
-    maxResults <- input[[paste0(inputId, "_search")]]$product_count
+    maxResults <- input[[paste0(inputId, "_search")]]$item_count
     
     if (is.null(query) || query == "") {
       return(NULL)

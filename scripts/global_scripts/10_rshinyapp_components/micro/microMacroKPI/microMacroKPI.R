@@ -101,7 +101,16 @@ format_kpi_value <- function(value, type = "decimal") {
   if (is.na(value) || !is.numeric(value)) {
     return("N/A")
   }
-  
+
+  # MP031: Defensive programming - ensure type is valid for switch
+  # MP099: Real-time error prevention
+  if (is.null(type) || length(type) == 0 || type == "") {
+    type <- "decimal"  # Default to decimal format
+  }
+
+  # Ensure type is character and length 1
+  type <- as.character(type)[1]
+
   switch(type,
     "currency" = paste0("$", format(round(value, 2), big.mark = ",", nsmall = 2)),
     "percentage" = paste0(format(round(value * 100, 1), nsmall = 1), "%"),
@@ -245,14 +254,14 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
       })
     })
     
-    # ------------ Data access (R116) -----------------------------------
+    # ------------ Data access (R116) with DuckDB optimization ----------
     kpi_data <- reactive({
       component_status("loading")
       
       result <- tryCatch({
         if (is.null(app_data_connection)) {
           warning("No valid database connection available")
-          return(data.frame())
+          return(list())
         }
         
         # Access DNA data using tbl2 (same as microCustomer)
@@ -260,65 +269,102 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
         
         # Apply platform filter if specified
         platform_val <- platform_id()
+        cat("🔍 DEBUG microMacroKPI platform_val:", platform_val, "\n")
         
-        if (!is.null(platform_val) && platform_val != "0") {
-          # Convert numeric platform_id to character for filtering
-          platform_char <- case_when(
-            platform_val == "2" ~ "amz",
-            platform_val == "1" ~ "eby", 
-            TRUE ~ "all"
-          )
-          if (platform_char != "all") {
-            tbl <- tbl %>% dplyr::filter(platform_id == platform_char)
-          }
+        if (!is.null(platform_val) && platform_val != "all") {
+          # Use platform_id directly as string (modern format: "eby", "amz")
+          cat("🎯 DEBUG applying platform filter:", platform_val, "\n")
+          tbl <- tbl %>% dplyr::filter(platform_id == platform_val)
+        } else {
+          cat("⚪ DEBUG no platform filter applied (platform_val:", platform_val, ")\n")
         }
         
         # Apply product line filter if specified
-        prod_line_val <- product_line_id()
+        # NOTE: df_dna_by_customer does not contain product_line information
+        # Customer DNA data is aggregated across all product lines
+        # Commenting out product line filter to avoid errors
+        # prod_line_val <- product_line_id()
+        # 
+        # if (!is.null(prod_line_val) && prod_line_val != "all") {
+        #   # Use local() to ensure prod_line_val is evaluated before SQL generation
+        #   local_prod_line <- prod_line_val
+        #   tbl <- tbl %>% dplyr::filter(product_line_id_filter == !!local_prod_line)
+        # }
         
-        if (!is.null(prod_line_val) && prod_line_val != "all") {
-          tbl <- tbl %>% dplyr::filter(product_line_id_filter == !!prod_line_val)
-        }
-        
-        # Collect results
-        filtered_data <- tbl %>% collect()
+        # DuckDB optimized: Calculate all KPI statistics in SQL instead of loading raw data
+        kpi_summary <- tbl %>%
+          summarise(
+            # Row 1: Customer Value Metrics
+            m_value_mean = mean(m_value, na.rm = TRUE),
+            m_value_sum = sum(m_value, na.rm = TRUE),
+            m_value_count = sum(case_when(!is.na(m_value) ~ 1, TRUE ~ 0)),
+            
+            f_value_mean = mean(f_value, na.rm = TRUE),
+            f_value_sum = sum(f_value, na.rm = TRUE),
+            f_value_count = sum(case_when(!is.na(f_value) ~ 1, TRUE ~ 0)),
+            
+            cai_mean = mean(cai, na.rm = TRUE),
+            cai_min = min(cai, na.rm = TRUE),
+            cai_max = max(cai, na.rm = TRUE),
+            cai_count = sum(case_when(!is.na(cai) ~ 1, TRUE ~ 0)),
+            
+            # Row 2: Customer Activity Metrics
+            ipt_mean_avg = mean(ipt_mean, na.rm = TRUE),
+            ipt_mean_count = sum(case_when(!is.na(ipt_mean) ~ 1, TRUE ~ 0)),
+            
+            pcv_mean = mean(pcv, na.rm = TRUE),
+            pcv_sum = sum(pcv, na.rm = TRUE),
+            pcv_count = sum(case_when(!is.na(pcv) ~ 1, TRUE ~ 0)),
+            
+            clv_mean = mean(clv, na.rm = TRUE),
+            clv_sum = sum(clv, na.rm = TRUE),
+            clv_count = sum(case_when(!is.na(clv) ~ 1, TRUE ~ 0)),
+            
+            # Row 3: Customer Loyalty Metrics
+            cri_mean = mean(cri, na.rm = TRUE),
+            cri_count = sum(case_when(!is.na(cri) ~ 1, TRUE ~ 0)),
+            
+            nt_mean = mean(nt, na.rm = TRUE),
+            nt_sum = sum(nt, na.rm = TRUE),
+            nt_count = sum(case_when(!is.na(nt) ~ 1, TRUE ~ 0)),
+            
+            e0t_mean = mean(e0t, na.rm = TRUE),
+            e0t_sum = sum(e0t, na.rm = TRUE),
+            e0t_count = sum(case_when(!is.na(e0t) ~ 1, TRUE ~ 0)),
+            
+            # Total record count
+            total_records = n()
+          ) %>%
+          collect()
         
         component_status("ready")
-        return(filtered_data)
+        return(kpi_summary)
       }, error = function(e) {
         warning("Error fetching KPI data: ", e$message)
         component_status("error")
-        data.frame()
+        list()
       })
       
       return(result)
     })
     
-    # ------------ KPI Statistics reactive -------------------------
-    kpi_statistics <- reactive({
-      data <- kpi_data()
-      if (is.null(data) || nrow(data) == 0) {
-        return(list())
-      }
-      
-      # Calculate statistics using the helper function
-      calculate_kpi_statistics(data)
-    })
+    # ------------ KPI Statistics (now calculated in SQL) ----------
+    # Statistics are now calculated directly in the kpi_data reactive
+    # No need for separate calculation step
     
-    # ------------ Helper function for safe value extraction --------
-    safeValue <- function(data, field_name, default = 0) {
-      if (is.null(data) || nrow(data) == 0 || !field_name %in% names(data)) {
+    # ------------ Helper function for safe summary value extraction --------
+    safeKPIValue <- function(summary_data, field_name, default = 0) {
+      if (is.null(summary_data) || nrow(summary_data) == 0 || !field_name %in% names(summary_data)) {
         return(default)
       }
       
-      values <- data[[field_name]]
-      values_clean <- values[!is.na(values) & is.finite(values)]
+      value <- summary_data[[field_name]][1]  # Get first (and only) row
       
-      if (length(values_clean) == 0) {
+      if (is.na(value) || !is.finite(value)) {
         return(default)
       }
       
-      return(values_clean)
+      return(value)
     }
     
     # ------------ Output Rendering ----------------------------------
@@ -335,7 +381,9 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
       platform_text <- if (is.null(platform_val) || platform_val == "0") "All Platforms" else paste("Platform", platform_val)
       product_text <- if (prod_line == "all") "All Product Lines" else paste("Product Line", prod_line)
       
-      paste0("Data: ", platform_text, " | ", product_text, " | Records: ", nrow(data))
+      total_records <- safeKPIValue(data, "total_records", 0)
+      
+      paste0("Data: ", platform_text, " | ", product_text, " | Records: ", total_records)
     })
     
     # Render individual KPI valueBoxes (similar to microCustomer approach)
@@ -343,18 +391,14 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     # Row 1: Customer Value Metrics (based on Customer DNA data)
     output$kpi_revenue <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "m_value", default = c(0))  # Monetary value from RFM
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        total_val <- sum(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "currency")
-        subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"), 
-                               " | Count: ", length(values))
-      } else {
-        display_val <- "$0.00"
-        subtitle_text <- "No monetary data available"
-      }
+      mean_val <- safeKPIValue(data, "m_value_mean", 0)
+      total_val <- safeKPIValue(data, "m_value_sum", 0)
+      count_val <- safeKPIValue(data, "m_value_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "currency")
+      subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"), 
+                             " | Count: ", count_val)
       
       valueBox(
         value = display_val,
@@ -366,18 +410,14 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     
     output$kpi_sales <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "f_value", default = c(0))  # Frequency value from RFM
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        total_val <- sum(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "decimal")
-        subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "integer"), 
-                               " | Count: ", length(values))
-      } else {
-        display_val <- "0.00"
-        subtitle_text <- "No frequency data available"
-      }
+      mean_val <- safeKPIValue(data, "f_value_mean", 0)
+      total_val <- safeKPIValue(data, "f_value_sum", 0)
+      count_val <- safeKPIValue(data, "f_value_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "decimal")
+      subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "integer"),
+                             " | Count: ", count_val)
       
       valueBox(
         value = display_val,
@@ -391,18 +431,16 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     # Row 2: Customer Activity Metrics
     output$kpi_rating <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "cai", default = c(0))  # Customer Activity Index
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "decimal")
-        subtitle_text <- paste0("Count: ", length(values), 
-                               " | Range: ", format_kpi_value(min(values, na.rm = TRUE), "decimal"),
-                               " - ", format_kpi_value(max(values, na.rm = TRUE), "decimal"))
-      } else {
-        display_val <- "0.00"
-        subtitle_text <- "No CAI data available"
-      }
+      mean_val <- safeKPIValue(data, "cai_mean", 0)
+      min_val <- safeKPIValue(data, "cai_min", 0)
+      max_val <- safeKPIValue(data, "cai_max", 0)
+      count_val <- safeKPIValue(data, "cai_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "decimal")
+      subtitle_text <- paste0("Count: ", count_val,
+                             " | Range: ", format_kpi_value(min_val, "decimal"),
+                             " - ", format_kpi_value(max_val, "decimal"))
       
       valueBox(
         value = display_val,
@@ -414,17 +452,13 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     
     output$kpi_cost <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "ipt_mean", default = c(0))  # Inter-Purchase Time
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "decimal")
-        subtitle_text <- paste0("Avg IPT: ", display_val, " days", 
-                               " | Count: ", length(values))
-      } else {
-        display_val <- "0.00"
-        subtitle_text <- "No IPT data available"
-      }
+      mean_val <- safeKPIValue(data, "ipt_mean_avg", 0)
+      count_val <- safeKPIValue(data, "ipt_mean_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "decimal")
+      subtitle_text <- paste0("Avg IPT: ", display_val, " days",
+                             " | Count: ", count_val)
       
       valueBox(
         value = display_val,
@@ -436,18 +470,14 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     
     output$kpi_roas <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "pcv", default = c(0))  # Past Customer Value
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        total_val <- sum(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "currency")
-        subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"), 
-                               " | Count: ", length(values))
-      } else {
-        display_val <- "$0.00"
-        subtitle_text <- "No PCV data available"
-      }
+      mean_val <- safeKPIValue(data, "pcv_mean", 0)
+      total_val <- safeKPIValue(data, "pcv_sum", 0)
+      count_val <- safeKPIValue(data, "pcv_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "currency")
+      subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"),
+                             " | Count: ", count_val)
       
       valueBox(
         value = display_val,
@@ -460,18 +490,14 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     # Row 3: Customer Lifetime Metrics
     output$kpi_impressions <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "clv", default = c(0))  # Customer Lifetime Value
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        total_val <- sum(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "currency")
-        subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"), 
-                               " | Count: ", length(values))
-      } else {
-        display_val <- "$0.00"
-        subtitle_text <- "No CLV data available"
-      }
+      mean_val <- safeKPIValue(data, "clv_mean", 0)
+      total_val <- safeKPIValue(data, "clv_sum", 0)
+      count_val <- safeKPIValue(data, "clv_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "currency")
+      subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"),
+                             " | Count: ", count_val)
       
       valueBox(
         value = display_val,
@@ -483,17 +509,13 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     
     output$kpi_clicks <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "cri", default = c(0))  # Customer Retention Index
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "decimal")
-        subtitle_text <- paste0("Avg CRI: ", display_val, 
-                               " | Count: ", length(values))
-      } else {
-        display_val <- "0.00"
-        subtitle_text <- "No CRI data available"
-      }
+      mean_val <- safeKPIValue(data, "cri_mean", 0)
+      count_val <- safeKPIValue(data, "cri_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "decimal")
+      subtitle_text <- paste0("Avg CRI: ", display_val,
+                             " | Count: ", count_val)
       
       valueBox(
         value = display_val,
@@ -507,18 +529,14 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     # Row 4: Transaction Metrics
     output$kpi_metric1 <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "nt", default = c(0))  # New customer transaction value
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        total_val <- sum(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "currency")
-        subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"), 
-                               " | Count: ", length(values))
-      } else {
-        display_val <- "$0.00"
-        subtitle_text <- "No new customer transaction data"
-      }
+      mean_val <- safeKPIValue(data, "nt_mean", 0)
+      total_val <- safeKPIValue(data, "nt_sum", 0)
+      count_val <- safeKPIValue(data, "nt_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "currency")
+      subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"),
+                             " | Count: ", count_val)
       
       valueBox(
         value = display_val,
@@ -530,18 +548,14 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     
     output$kpi_metric2 <- renderValueBox({
       data <- kpi_data()
-      values <- safeValue(data, "e0t", default = c(0))  # Existing customer transaction value
       
-      if (length(values) > 0) {
-        mean_val <- mean(values, na.rm = TRUE)
-        total_val <- sum(values, na.rm = TRUE)
-        display_val <- format_kpi_value(mean_val, "currency")
-        subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"), 
-                               " | Count: ", length(values))
-      } else {
-        display_val <- "$0.00"
-        subtitle_text <- "No existing customer transaction data"
-      }
+      mean_val <- safeKPIValue(data, "e0t_mean", 0)
+      total_val <- safeKPIValue(data, "e0t_sum", 0)
+      count_val <- safeKPIValue(data, "e0t_count", 0)
+      
+      display_val <- format_kpi_value(mean_val, "currency")
+      subtitle_text <- paste0("Total: ", format_kpi_value(total_val, "currency"),
+                             " | Count: ", count_val)
       
       valueBox(
         value = display_val,
@@ -554,13 +568,33 @@ microMacroKPIServer <- function(id, app_data_connection = NULL, config = NULL,
     
     # Display component status
     output$component_status <- renderText({
-      switch(component_status(),
+      data <- kpi_data()
+      record_count <- if (is.null(data) || nrow(data) == 0) 0 else safeKPIValue(data, "total_records", 0)
+
+      # MP031: Defensive programming - check for NULL/empty values before switch
+      # R113: Error handling for reactive expressions
+      status_val <- tryCatch({
+        component_status()
+      }, error = function(e) {
+        warning("Error getting component status: ", e$message)
+        "idle"
+      })
+
+      # MP099: Defensive check for NULL or empty status
+      if (is.null(status_val) || length(status_val) == 0 || status_val == "") {
+        return("Ready for KPI analysis")
+      }
+
+      # Ensure status_val is character and length 1 for switch
+      status_val <- as.character(status_val)[1]
+
+      switch(status_val,
              idle = "Ready for KPI analysis",
              loading = "Loading KPI data...",
-             ready = paste0("Analysis complete - ", length(kpi_statistics()), " KPIs calculated"),
+             ready = paste0("Analysis complete - 9 KPIs calculated from ", record_count, " records"),
              computing = "Computing KPI statistics...",
              error = "Error in KPI analysis",
-             component_status())
+             status_val)  # Default: return the status value itself
     })
     
     # Return reactive values for external use

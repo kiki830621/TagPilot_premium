@@ -89,8 +89,8 @@ ui <- bs4DashPage(
   sidebar = bs4DashSidebar(status="primary", width="300px", elevation = 3,minified  = FALSE,
                            sidebarMenu(id="sidebar_menu",
                                        bs4SidebarHeader("Application Settings"),
-                                       bs4SidebarMenuproduct("Customer DNA",   tabName="microCustomer", icon=icon("users")),
-                                       bs4SidebarMenuproduct("DNA Distribution", tabName="dna",          icon=icon("chart-bar")) ),
+                                       bs4SidebarMenuItem("Customer DNA",   tabName="microCustomer", icon=icon("users")),
+                                       bs4SidebarMenuItem("DNA Distribution", tabName="dna",          icon=icon("chart-bar")) ),
                            # 共用 Platform Filter
                            div(class="sidebar-section p-3 mt-2",
                                h5("Platform", class="mb-3"),
@@ -116,9 +116,9 @@ ui <- bs4DashPage(
                            uiOutput("dynamic_filter") ),
   
   body = bs4DashBody(css_deps, useShinyjs(),
-                     bs4Tabproducts(
-                       bs4Tabproduct(tabName="microCustomer", fluidRow(column(12, bs4Card(title="Customer DNA Analysis", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("cust_display"))))),
-                       bs4Tabproduct(tabName="dna",          fluidRow(column(12, bs4Card(title="DNA Distribution",     status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("dna_display"))))) ) ),
+                     bs4TabItems(
+                       bs4TabItem(tabName="microCustomer", fluidRow(column(12, bs4Card(title="Customer DNA Analysis", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("cust_display"))))),
+                       bs4TabItem(tabName="dna",          fluidRow(column(12, bs4Card(title="DNA Distribution",     status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("dna_display"))))) ) ),
   
   footer = dashboardFooter(fixed=TRUE, right="Version 1.0.0 | 2025") )
 

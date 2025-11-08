@@ -25,11 +25,17 @@
 #
 # Features:
 #   • Strategic positioning analysis based on key factors
-#   • Four-quadrant strategy visualization (Argument/Improvement/Weakness/Change)
+#   • Four-quadrant strategy visualization (Appeal/Improvement/Weakness/Change)
 #   • Dynamic font sizing based on content length
 #   • Interactive Plotly visualization with responsive text
 #   • Product-specific strategy recommendations
 # -----------------------------------------------------------------------------
+
+# Source required utilities (MP031: Separation of Concerns, MP032: DRY) ------
+# Load centralized OpenAI prompt management function
+if (file.exists("scripts/global_scripts/08_ai/fn_load_openai_prompt.R")) {
+  source("scripts/global_scripts/08_ai/fn_load_openai_prompt.R")
+}
 
 # helper ----------------------------------------------------------------------
 #' Paste operator for string concatenation
@@ -119,29 +125,41 @@ chat_api <- function(messages, api_key, model = "o4-mini") {
   })
 }
 
-#' Format keys for display with improved spacing
+#' Format keys for display with improved spacing and text wrapping
 #' @param keys character vector. Keys to format
-#' @param max_per_line integer. Maximum products per line (default: 2)
+#' @param max_per_line integer. Maximum items per line (default: 2)
+#' @param max_width integer. Maximum character width per item (default: 15)
 #' @return character. Formatted string with proper spacing
-format_keys <- function(keys, max_per_line = 2) {
+format_keys <- function(keys, max_per_line = 2, max_width = 15) {
   if (length(keys) == 0) {
     return("")
   }
-  
-  result <- ""
-  for (i in seq_along(keys)) {
-    if (i %% max_per_line == 1 && i > 1) {
-      # Start new line after every max_per_line products
-      result <- paste0(result, "\n", keys[i])
-    } else if (i == 1) {
-      # First product
-      result <- keys[i]
+
+  # Wrap long text to prevent overflow (MP073: Interactive Visualization)
+  wrapped_keys <- sapply(keys, function(key) {
+    if (nchar(key) > max_width) {
+      # Simple wrapping: split at max_width
+      # For Chinese characters, we might want more sophisticated wrapping
+      substr(key, 1, max_width - 2) %+% ".."
     } else {
-      # Add tab spacing
-      result <- paste0(result, "\t\t", keys[i])
+      key
+    }
+  })
+
+  result <- ""
+  for (i in seq_along(wrapped_keys)) {
+    if (i %% max_per_line == 1 && i > 1) {
+      # Start new line after every max_per_line items
+      result <- paste0(result, "\n", wrapped_keys[i])
+    } else if (i == 1) {
+      # First item
+      result <- wrapped_keys[i]
+    } else {
+      # Add spacing with bullet points for clarity
+      result <- paste0(result, " • ", wrapped_keys[i])
     }
   }
-  
+
   return(result)
 }
 
@@ -172,17 +190,17 @@ calculate_dynamic_font_size <- function(text, base_size = 16, min_size = 10, max
 
 #' Perform strategy analysis for a specific product
 #' @param data data.frame. Position data with numerical attributes
-#' @param selected_product_id character. product ID of the selected product
+#' @param selected_product_id character. Product ID of the selected product
 #' @param key_factors character vector. List of key factors
 #' @param exclude_vars character vector. Variables to exclude from analysis
 #' @return list. Contains strategy analysis results
 perform_strategy_analysis <- function(data, selected_product_id, key_factors, exclude_vars = NULL) {
   if (is.null(selected_product_id) || selected_product_id == "" || length(key_factors) == 0) {
     return(list(
-      argument_text = "",
+      appeal_text = "",
       improvement_text = "",
       weakness_text = "",
-      changing_text = "",
+      change_text = "",
       selected_product = NULL
     ))
   }
@@ -190,20 +208,26 @@ perform_strategy_analysis <- function(data, selected_product_id, key_factors, ex
   # Remove NA columns (equivalent to SA_token <- SA %>% remove_na_columns())
   sa_token <- remove_na_columns(data)
   
-  # Check if product_id column exists, if not look for platform-specific columns
+  # MP031: Defensive programming for product identifier columns
+  # Check if product_id column exists, if not look for platform-specific columns or item_id
   if (!"product_id" %in% names(sa_token)) {
-    # Try common platform-specific columns
-    if ("asin" %in% names(sa_token)) {
+    # Try common platform-specific columns and item_id
+    if ("item_id" %in% names(sa_token)) {
+      sa_token <- sa_token %>% dplyr::rename(product_id = item_id)
+      message("🔄 Renamed item_id to product_id for consistency")
+    } else if ("asin" %in% names(sa_token)) {
       sa_token <- sa_token %>% dplyr::rename(product_id = asin)
-    } else if ("ebay_product_number" %in% names(sa_token)) {
-      sa_token <- sa_token %>% dplyr::rename(product_id = ebay_product_number)
+      message("🔄 Renamed asin to product_id for consistency")
+    } else if ("ebay_item_number" %in% names(sa_token)) {
+      sa_token <- sa_token %>% dplyr::rename(product_id = ebay_item_number)
+      message("🔄 Renamed ebay_item_number to product_id for consistency")
     } else {
-      warning("No product identifier column found in strategy analysis data")
+      warning("No product identifier column found in strategy analysis data. Available columns: ", paste(names(sa_token), collapse = ", "))
       return(list(
-        argument_text = "Error: No product identifier column found",
+        appeal_text = "Error: No product identifier column found",
         improvement_text = "",
         weakness_text = "",
-        changing_text = "",
+        change_text = "",
         selected_product = NULL
       ))
     }
@@ -213,16 +237,16 @@ perform_strategy_analysis <- function(data, selected_product_id, key_factors, ex
   sa_token <- sa_token %>%
     dplyr::mutate(product_id = as.character(product_id))
   
-  # Filter for the selected product ID
+  # Filter for the selected Product ID
   sub_sa <- sa_token %>% dplyr::filter(product_id == selected_product_id)
   
   if (nrow(sub_sa) == 0) {
-    warning("Selected product ID not found in data")
+    warning("Selected Product ID not found in data")
     return(list(
-      argument_text = "Product not found",
+      appeal_text = "Product not found",
       improvement_text = "",
       weakness_text = "",
-      changing_text = "",
+      change_text = "",
       selected_product = NULL
     ))
   }
@@ -237,10 +261,10 @@ perform_strategy_analysis <- function(data, selected_product_id, key_factors, ex
   
   if (ncol(numeric_data) == 0) {
     return(list(
-      argument_text = "No numeric data available",
+      appeal_text = "No numeric data available",
       improvement_text = "",
       weakness_text = "",
-      changing_text = "",
+      change_text = "",
       selected_product = sub_sa
     ))
   }
@@ -266,22 +290,22 @@ perform_strategy_analysis <- function(data, selected_product_id, key_factors, ex
   }
   
   # Generate strategy texts
-  argument_factors <- names(sub_dir[sub_dir > key_mean])
+  appeal_factors <- names(sub_dir[sub_dir > key_mean])
   improvement_factors <- names(sub_dir_not_key[sub_dir_not_key > non_key_mean])
   weakness_factors <- names(sub_dir_not_key[sub_dir_not_key <= non_key_mean])
-  changing_factors <- names(sub_dir[sub_dir <= key_mean])
+  change_factors <- names(sub_dir[sub_dir <= key_mean])
   
   # Format the strategy texts
-  argument_text <- format_keys(argument_factors)
+  appeal_text <- format_keys(appeal_factors)
   improvement_text <- format_keys(improvement_factors)
   weakness_text <- format_keys(weakness_factors)
-  changing_text <- format_keys(changing_factors)
+  change_text <- format_keys(change_factors)
   
   return(list(
-    argument_text = argument_text,
+    appeal_text = appeal_text,
     improvement_text = improvement_text,
     weakness_text = weakness_text,
-    changing_text = changing_text,
+    change_text = change_text,
     selected_product = sub_sa,
     key_factors_used = key_factors_present,
     non_key_factors_used = non_key_factors
@@ -304,7 +328,7 @@ positionStrategyFilterUI <- function(id, translate = identity) {
     # Product selection
     selectizeInput(
       inputId = ns("selected_product_id"),
-      label = translate("Select Product (product ID)"),
+      label = translate("Select Product (Product ID)"),
       choices = NULL,
       options = list(
         placeholder = translate("Choose a product..."),
@@ -427,17 +451,17 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
                                   session = getDefaultReactiveDomain()) {
   moduleServer(id, function(input, output, session) {
     
-    # ------------ Get OpenAI API key from app_configs --------------
-    gpt_key <- if (exists("app_configs") && !is.null(app_configs$OPENAI_API_KEY)) {
-      key <- app_configs$OPENAI_API_KEY
+    # ------------ Get OpenAI API key from environment --------------
+    gpt_key <- Sys.getenv("OPENAI_API_KEY", "")
+    
+    if (nzchar(gpt_key)) {
       # Basic validation of API key format
-      if (!grepl("^sk-", key)) {
+      if (!grepl("^sk-", gpt_key)) {
         warning("OpenAI API key format appears incorrect. Should start with 'sk-'")
       }
-      key
     } else {
-      warning("OpenAI API key not found in app_configs. AI analysis features will be disabled.")
-      NULL
+      warning("OpenAI API key not found in environment. AI analysis features will be disabled.")
+      gpt_key <- NULL
     }
     
     # ------------ Status tracking ----------------------------------
@@ -524,20 +548,38 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
       # Simple key factor identification (reuse logic from KFE component)
       # This could be extracted into a shared utility function
       
-      # Check if product_id column exists, if not try to find platform-specific column
+      # MP031: Defensive programming for product identifier columns
+      # Check if product_id column exists, if not try to find platform-specific column or item_id
       if (!"product_id" %in% names(data)) {
-        platform <- platform_id()
-        product_col <- switch(platform,
-          "2" = "asin",  # Amazon
-          "3" = "ebay_product_number",  # eBay
-          "product_id"  # Default fallback
-        )
-        
-        if (product_col %in% names(data)) {
-          data <- data %>% dplyr::rename(product_id = !!sym(product_col))
+        # First try item_id which is the actual column in df_position
+        if ("item_id" %in% names(data)) {
+          message("DEBUG: Renaming item_id to product_id in key_factors reactive")
+          data <- data %>% dplyr::rename(product_id = item_id)
         } else {
-          warning("No product identifier column found in key_factors data")
-          return(character(0))
+          platform <- platform_id()
+
+          # Ensure platform is a scalar value for switch statement
+          if (is.null(platform) || length(platform) == 0) {
+            platform <- "default"
+          } else if (length(platform) > 1) {
+            warning("platform_id() returned multiple values, using first: ", paste(platform, collapse=", "))
+            platform <- as.character(platform[1])
+          } else {
+            platform <- as.character(platform)
+          }
+
+          item_col <- switch(platform,
+            "2" = "asin",  # Amazon
+            "3" = "ebay_item_number",  # eBay
+            "product_id"  # Default fallback
+          )
+
+          if (item_col %in% names(data)) {
+            data <- data %>% dplyr::rename(product_id = !!sym(item_col))
+          } else {
+            warning("No product identifier column found in key_factors data")
+            return(character(0))
+          }
         }
       }
       
@@ -556,7 +598,7 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
         return(character(0))
       }
       
-      # Now remove excluded variables including product_id and brand
+      # Now remove excluded variables including item_id and brand
       exclude_vars <- c("product_line_id", "platform_id", "rating", "sales", "revenue", "product_id", "brand")
       df_analysis <- df_analysis %>% dplyr::select(-dplyr::any_of(exclude_vars))
       ideal_row <- ideal_row %>% dplyr::select(-dplyr::any_of(exclude_vars))
@@ -570,19 +612,26 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
         return(character(0))
       }
       
-      # Simple key factor identification based on ideal values
-      key_factors <- character(0)
-      for (col in numeric_cols) {
-        ideal_val <- ideal_row[[col]][1]
-        if (!is.na(ideal_val) && is.numeric(ideal_val) && is.finite(ideal_val) && ideal_val > 0) {
-          key_factors <- c(key_factors, col)
-        }
+      # Key factor identification following MK03 principle (cross-attribute average)
+      # Extract ideal point vector
+      ideal_point_vector <- as.numeric(ideal_row[numeric_cols])
+      names(ideal_point_vector) <- numeric_cols
+
+      # Remove any NA values
+      valid_ideal <- ideal_point_vector[!is.na(ideal_point_vector)]
+
+      if (length(valid_ideal) == 0) {
+        return(character(0))
       }
-      
+
+      # MK03 principle: Use cross-attribute average as threshold
+      cross_attr_avg <- mean(valid_ideal, na.rm = TRUE)
+      key_factors <- names(valid_ideal[valid_ideal > cross_attr_avg])
+
       return(key_factors)
     })
     
-    # ------------ Update product ID choices ----------------------------
+    # ------------ Update Product ID choices ----------------------------
     observe({
       data <- position_data()
       # MP035: Null Special Treatment - Handle NA and NULL values safely
@@ -601,27 +650,45 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
       # Debug: Check what columns are available
       message("DEBUG: Available columns in position_data: ", paste(names(data), collapse = ", "))
       
-      # Check if product_id column exists, if not try to find platform-specific column
+      # MP031: Defensive programming for product identifier columns
+      # Check if product_id column exists, if not try to find platform-specific column or item_id
       if (!"product_id" %in% names(data)) {
-        # Try to find platform-specific column
-        platform <- platform_id()
-        product_col <- switch(platform,
-          "2" = "asin",  # Amazon
-          "3" = "ebay_product_number",  # eBay
-          "product_id"  # Default fallback
-        )
-        
-        if (product_col %in% names(data)) {
-          message("DEBUG: Using platform-specific column '", product_col, "' and renaming to 'product_id'")
-          data <- data %>% dplyr::rename(product_id = !!sym(product_col))
+        # First try item_id which is the actual column in df_position
+        if ("item_id" %in% names(data)) {
+          message("DEBUG: Renaming item_id to product_id in Product ID choices observer")
+          data <- data %>% dplyr::rename(product_id = item_id)
         } else {
-          warning("No product identifier column found in data. Available columns: ", paste(names(data), collapse = ", "))
-          updateSelectizeInput(session, "selected_product_id", choices = character(0))
-          return()
+          # Try to find platform-specific column
+          platform <- platform_id()
+
+          # Ensure platform is a scalar value for switch statement
+          if (is.null(platform) || length(platform) == 0) {
+            platform <- "default"
+          } else if (length(platform) > 1) {
+            warning("platform_id() returned multiple values, using first: ", paste(platform, collapse=", "))
+            platform <- as.character(platform[1])
+          } else {
+            platform <- as.character(platform)
+          }
+
+          item_col <- switch(platform,
+            "2" = "asin",  # Amazon
+            "3" = "ebay_item_number",  # eBay
+            "product_id"  # Default fallback
+          )
+
+          if (item_col %in% names(data)) {
+            message("DEBUG: Using platform-specific column '", item_col, "' and renaming to 'product_id'")
+            data <- data %>% dplyr::rename(product_id = !!sym(item_col))
+          } else {
+            warning("No product identifier column found in data. Available columns: ", paste(names(data), collapse = ", "))
+            updateSelectizeInput(session, "selected_product_id", choices = character(0))
+            return()
+          }
         }
       }
       
-      # Get available product IDs (excluding special rows)
+      # Get available Product IDs (excluding special rows)
       available_product_ids <- data %>%
         dplyr::mutate(product_id = as.character(product_id)) %>%
         dplyr::filter(!product_id %in% c("Ideal", "Rating", "Revenue")) %>%
@@ -648,8 +715,56 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
       
       component_status("computing")
       
-      # Define variables to exclude from analysis
-      exclude_vars <- c("product_line_id", "platform_id", "rating", "sales", "revenue")
+      # Use centralized filter configuration (MP064: ETL-Derivation separation)
+      # Source the filter function if not already available
+      if (!exists("filter_covariates")) {
+        filter_path <- file.path(
+          Sys.getenv("APP_ROOT", "."),
+          "scripts/global_scripts/04_utils/fn_filter_covariates.R"
+        )
+        if (file.exists(filter_path)) {
+          source(filter_path)
+        } else {
+          # Try relative path from component location
+          alt_path <- "../../04_utils/fn_filter_covariates.R"
+          if (file.exists(alt_path)) {
+            source(alt_path)
+          }
+        }
+      }
+      
+      # Get all columns to consider for exclusion
+      all_vars <- names(data)
+      
+      # Apply comprehensive filtering if function available
+      if (exists("filter_covariates")) {
+        # Use positioning_analysis configuration which is more appropriate
+        kept_vars <- tryCatch({
+          filter_covariates(
+            data = data,
+            var_names = all_vars,
+            app_type = "positioning_analysis",
+            verbose = FALSE
+          )
+        }, error = function(e) {
+          message("Warning: filter_covariates failed, using fallback: ", e$message)
+          # Fallback to essential exclusions only
+          setdiff(all_vars, c("product_line_id", "platform_id", "rating", "sales", "revenue"))
+        })
+        
+        # Calculate variables to exclude (inverse of kept)
+        exclude_vars <- setdiff(all_vars, kept_vars)
+        
+        # Always ensure these core variables are excluded regardless
+        core_excludes <- c("product_line_id", "platform_id", "rating", "sales", "revenue")
+        exclude_vars <- unique(c(exclude_vars, core_excludes))
+        
+        message("Strategy analysis excluding ", length(exclude_vars), " variables based on configuration")
+      } else {
+        # Fallback if filter function not available
+        exclude_vars <- c("product_line_id", "platform_id", "rating", "sales", "revenue")
+        message("Using fallback exclusion list (filter_covariates not available)")
+      }
       
       result <- perform_strategy_analysis(
         data = data,
@@ -712,10 +827,10 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
             } else "Unknown"
           ),
           strategy_analysis = list(
-            argument_factors = current_strategy$argument_text,      # 訴求 - 可以強調的優勢
+            appeal_factors = current_strategy$appeal_text,          # 訴求 - 可以強調的優勢
             improvement_factors = current_strategy$improvement_text, # 改善 - 可以改善的地方
             weakness_factors = current_strategy$weakness_text,      # 劣勢 - 需要解決的弱點
-            changing_factors = current_strategy$changing_text       # 改變 - 需要調整的關鍵因素
+            change_factors = current_strategy$change_text           # 改變 - 需要調整的關鍵因素
           )
         )
         
@@ -724,38 +839,70 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
                                         keep_vec_names = FALSE)
         
         incProgress(0.6, detail = "Calling AI analysis...")
-        
-        # Create prompt based on four-quadrant strategy analysis
-        sys <- list(role = "system", content = "You are a professional marketing strategist. Please respond in Traditional Chinese.")
-        usr <- list(
-          role = "user",
-          content = paste0(
-            "根據四象限策略分析結果，為該產品提供具體的行銷策略建議。請使用以下 markdown 架構，但**只顯示該產品實際有因素的部分**：",
-            "\n\n## 產品策略分析",
-            "\n\n### 訴求策略",
-            "\n（僅當 argument_factors 有內容時顯示此部分）",
-            "\n基於該產品的優勢因素，建議如何在行銷中突出這些優勢。",
-            "\n\n### 改善策略", 
-            "\n（僅當 improvement_factors 有內容時顯示此部分）",
-            "\n基於可改善因素，提出產品優化方向。",
-            "\n\n### 劣勢應對",
-            "\n（僅當 weakness_factors 有內容時顯示此部分）",
-            "\n基於弱勢因素，建議如何在行銷中減少負面影響。",
-            "\n\n### 關鍵調整",
-            "\n（僅當 changing_factors 有內容時顯示此部分）",
-            "\n基於需要改變的因素，提出重點改進建議。",
-            "\n\n**重要規則**：",
-            "\n- 如果某個象限沒有因素（空白或無內容），請完全跳過該部分的標題和內容",
-            "\n- 針對具體的因素變數提供實用的策略建議和廣告文案方向",
-            "\n- 保持 markdown 格式，不要用程式碼區塊包起來",
-            "\n- 字數限制300字內",
-            "\n\n四象限分析資料：", strategy_txt
+
+        # Load centralized prompt configuration (MP031: Separation of Concerns, MP032: DRY)
+        prompt_config <- NULL
+        model_to_use <- "o4-mini"  # Default model
+
+        # Try to load centralized prompt if function exists
+        if (exists("load_openai_prompt")) {
+          tryCatch({
+            prompt_config <- load_openai_prompt("position_analysis.strategy_quadrant_analysis")
+            model_to_use <- prompt_config$model %||% "o4-mini"
+          }, error = function(e) {
+            # Fallback to hardcoded prompt if loading fails
+            message("Note: Using hardcoded prompt. Centralized prompt loading failed: ", e$message)
+          })
+        }
+
+        # Create prompt - use centralized or fallback to hardcoded
+        if (!is.null(prompt_config)) {
+          # Use centralized prompt configuration (MP032: DRY Principle)
+          sys <- list(role = "system", content = prompt_config$system_prompt)
+
+          # Replace template variables in user prompt
+          user_content <- prompt_config$user_prompt_template
+          user_content <- gsub("\\{appeal_factors\\}", "appeal_factors", user_content)
+          user_content <- gsub("\\{improvement_factors\\}", "improvement_factors", user_content)
+          user_content <- gsub("\\{weakness_factors\\}", "weakness_factors", user_content)
+          user_content <- gsub("\\{change_factors\\}", "change_factors", user_content)
+          user_content <- gsub("\\{strategy_data\\}", strategy_txt, user_content)
+
+          usr <- list(role = "user", content = user_content)
+        } else {
+          # Fallback to hardcoded prompt (for backward compatibility)
+          sys <- list(role = "system", content = "You are a professional marketing strategist. Please respond in Traditional Chinese.")
+          usr <- list(
+            role = "user",
+            content = paste0(
+              "根據四象限策略分析結果，為該產品提供具體的行銷策略建議。請使用以下 markdown 架構，但**只顯示該產品實際有因素的部分**：",
+              "\n\n## 產品策略分析",
+              "\n\n### 訴求",
+              "\n（僅當 appeal_factors 有內容時顯示此部分）",
+              "\n基於該產品的優勢因素，建議如何在行銷中突出這些優勢。",
+              "\n\n### 改善",
+              "\n（僅當 improvement_factors 有內容時顯示此部分）",
+              "\n基於可改善因素，提出產品優化方向。",
+              "\n\n### 劣勢",
+              "\n（僅當 weakness_factors 有內容時顯示此部分）",
+              "\n基於弱勢因素，建議如何在行銷中減少負面影響。",
+              "\n\n### 改變",
+              "\n（僅當 change_factors 有內容時顯示此部分）",
+              "\n基於需要改變的因素，提出重點改進建議。",
+              "\n\n**重要規則**：",
+              "\n- 如果某個象限沒有因素（空白或無內容），請完全跳過該部分的標題和內容",
+              "\n- 針對具體的因素變數提供實用的策略建議和廣告文案方向",
+              "\n- 保持 markdown 格式，不要用程式碼區塊包起來",
+              "\n- 字數限制300字內",
+              "\n\n四象限分析資料：", strategy_txt
+            )
           )
-        )
+        }
         
         incProgress(0.8, detail = "Processing AI response...")
-        
-        txt <- chat_api(list(sys, usr), gpt_key)
+
+        # Use model from centralized config if available (MP051: Explicit Parameter Specification)
+        txt <- chat_api(list(sys, usr), gpt_key, model = model_to_use)
         
         incProgress(0.9, detail = "Finalizing results...")
         
@@ -797,7 +944,7 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
       brand <- if ("brand" %in% names(product)) product$brand[1] else "Unknown"
       product_id <- if ("product_id" %in% names(product)) product$product_id[1] else "Unknown"
       
-      paste0("Brand: ", brand, "\nproduct ID: ", product_id, "\nKey Factors Available: ", length(result$key_factors_used))
+      paste0("Brand: ", brand, "\nProduct ID: ", product_id, "\nKey Factors Available: ", length(result$key_factors_used))
     })
     
     # Render the strategy plot
@@ -827,60 +974,63 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
       labels <- if (input$label_language == "zh") {
         c("訴求", "改善", "劣勢", "改變")
       } else {
-        c("Argument", "Improvement", "Weakness", "Change")
+        c("Appeal", "Improvement", "Weakness", "Change")
       }
       
       # Get font size - make it larger for better visibility
       base_size <- (input$base_font_size %||% 16) + 4  # Increase base size
       
       # Calculate dynamic font sizes for each text - use larger minimum size
-      argument_size <- calculate_dynamic_font_size(result$argument_text, base_size, min_size = 14, max_size = 28)
+      appeal_size <- calculate_dynamic_font_size(result$appeal_text, base_size, min_size = 14, max_size = 28)
       improvement_size <- calculate_dynamic_font_size(result$improvement_text, base_size, min_size = 14, max_size = 28)
       weakness_size <- calculate_dynamic_font_size(result$weakness_text, base_size, min_size = 14, max_size = 28)
-      changing_size <- calculate_dynamic_font_size(result$changing_text, base_size, min_size = 14, max_size = 28)
+      change_size <- calculate_dynamic_font_size(result$change_text, base_size, min_size = 14, max_size = 28)
       
       # Create the plot
       p <- plot_ly() %>%
         # Add quadrant labels
         add_trace(
           type = 'scatter', mode = 'text',
-          x = c(5, -5, -5, 5), y = c(9, 9, -2, -2),
+          x = c(4, -4, -4, 4), y = c(9, 9, -2, -2),
           text = labels,
           textfont = list(color = "blue", size = base_size + 4),
           showlegend = FALSE,
           hoverinfo = 'none'
         ) %>%
-        # Add strategy content
+        # Add strategy content (moved inward from edges for better visibility)
         add_trace(
           type = 'scatter', mode = 'text',
-          x = c(5, -5, -5, 5), y = c(5, 5, -7, -7),
-          text = c(result$argument_text, result$improvement_text, result$weakness_text, result$changing_text),
+          x = c(3.5, -3.5, -3.5, 3.5), y = c(5, 5, -7, -7),
+          text = c(result$appeal_text, result$improvement_text, result$weakness_text, result$change_text),
           textfont = list(
-            size = c(argument_size, improvement_size, weakness_size, changing_size), 
+            size = c(appeal_size, improvement_size, weakness_size, change_size),
             color = "darkblue"
           ),
           showlegend = FALSE,
           hoverinfo = 'text',
           hovertext = c(
-            paste("Argument Factors:", result$argument_text),
+            paste("Appeal Factors:", result$appeal_text),
             paste("Improvement Areas:", result$improvement_text),
             paste("Weakness Areas:", result$weakness_text),
-            paste("Change Needed:", result$changing_text)
+            paste("Change Needed:", result$change_text)
           )
         ) %>%
         layout(
-          xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE, range = c(-10, 10), fixedrange = TRUE),
-          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE, range = c(-10, 10), fixedrange = TRUE),
+          # Add generous margins to prevent text cutoff (MP073, MP106)
+          margin = list(l = 80, r = 80, t = 60, b = 60),
+          # Expand axis ranges to provide more space for text
+          xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE, range = c(-12, 12), fixedrange = TRUE),
+          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE, range = c(-12, 12), fixedrange = TRUE),
           plot_bgcolor = 'white',
           showlegend = FALSE,
-          # Add cross-hairs
+          # Add cross-hairs (adjusted for expanded range)
           shapes = list(
             list(
-              type = 'line', x0 = 0, x1 = 0, y0 = -10, y1 = 10,
+              type = 'line', x0 = 0, x1 = 0, y0 = -12, y1 = 12,
               line = list(color = "black", width = 2)
             ),
             list(
-              type = 'line', x0 = -10, x1 = 10, y0 = 0, y1 = 0,
+              type = 'line', x0 = -12, x1 = 12, y0 = 0, y1 = 0,
               line = list(color = "black", width = 2)
             )
           )
@@ -898,16 +1048,30 @@ positionStrategyServer <- function(id, app_data_connection = NULL, config = NULL
     
     # Display component status
     output$component_status <- renderText({
-      prod_line <- product_line_id()
-      status_prefix <- if (prod_line == "all") "All product lines - " else paste0("Product line ", prod_line, " - ")
-      
-      switch(component_status(),
-             idle = paste0(status_prefix, "Ready for strategy analysis"),
-             loading = paste0(status_prefix, "Loading position data..."),
-             ready = paste0(status_prefix, "Analysis ready - ", length(key_factors()), " key factors identified"),
-             computing = paste0(status_prefix, "Computing strategy analysis..."),
-             error = paste0(status_prefix, "Error in strategy analysis"),
-             paste0(status_prefix, component_status()))
+      # MP031: Defensive programming - check for NULL/empty values before switch
+      # R113: Error handling for reactive expressions
+      status_val <- tryCatch({
+        component_status()
+      }, error = function(e) {
+        warning("Error getting component status: ", e$message)
+        "idle"
+      })
+
+      # MP099: Defensive check for NULL or empty status
+      if (is.null(status_val) || length(status_val) == 0 || status_val == "") {
+        return("Ready for position analysis")
+      }
+
+      # Ensure status_val is character and length 1 for switch
+      status_val <- as.character(status_val)[1]
+
+      switch(status_val,
+             idle = "Ready for position analysis",
+             loading = "Loading position data...",
+             ready = paste0("Position data loaded: ", nrow(position_data()), " records"),
+             computing = "Computing position metrics...",
+             error = "Error loading position data",
+             status_val)  # Default: return the status value itself
     })
     
     # Return reactive values for external use

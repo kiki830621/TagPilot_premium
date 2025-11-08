@@ -31,13 +31,39 @@ initialize_packages(mode = OPERATION_MODE,
                     force_update = FALSE)
 
 # -----------------------------------------------------------------------------
-# 3. Global script loading (only stable public APIs)
+# 3. Load environment variables from .env file
+# -----------------------------------------------------------------------------
+# Check for .env file in APP_DIR (project root)
+env_file <- file.path(APP_DIR, ".env")
+if (file.exists(env_file)) {
+  # Use dotenv package if available, otherwise use readRenviron
+  if (requireNamespace("dotenv", quietly = TRUE)) {
+    dotenv::load_dot_env(file = env_file)
+    message("Environment variables loaded from .env using dotenv package")
+  } else {
+    readRenviron(env_file)
+    message("Environment variables loaded from .env using readRenviron")
+  }
+  
+  # Verify critical environment variables
+  if (nzchar(Sys.getenv("OPENAI_API_KEY"))) {
+    message("✓ OPENAI_API_KEY is set")
+  } else {
+    warning("⚠ OPENAI_API_KEY is not set - AI features will be disabled")
+  }
+} else {
+  message("No .env file found in ", APP_DIR)
+}
+
+# -----------------------------------------------------------------------------
+# 4. Global script loading (only stable public APIs)
 # -----------------------------------------------------------------------------
 source(file.path(GLOBAL_DIR, "04_utils", "fn_get_r_files_recursive.R"))
 load_dirs <- c(
   "02_db_utils",
   "04_utils",
   "03_config",
+  "08_ai",  # AI-related functions including fn_chat_api
   "10_rshinyapp_components",
   "11_rshinyapp_utils"
 )

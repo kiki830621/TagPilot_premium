@@ -1,179 +1,205 @@
 #' @file fn_dbDisconnect_all.R
 #' @use_package DBI
-#' @note Depends 02_db_utils/fn_dbConnect_from_list.R
-#' @note Depends 02_db_utils/fn_dbDetach_all.R
-#' @note Implements MP080 (Database Synchronization)
 #'
-#' @title Disconnect All Database Connections — Export-Replace (No-Extension, v3.2)
+#' @title Disconnect All Database Connections (General DBI Implementation)
 #'
 #' @description
-#' 關閉全域 DBI 連線。對 DuckDB 連線：
-#' 1. 先嘗試 `EXPORT DATABASE … (FORMAT duckdb)`（若版本支援且 build 內含 copy-function）。
-#' 2. 若失敗或 DuckDB < 0.9，改用
-#'    `ATTACH <tmp> AS <alias>; COPY FROM DATABASE <src> TO <alias>; DETACH <alias>;`。
-#'    - `src` 由 `PRAGMA database_list;` 取得，`alias` 為隨機 `db_XXXXXXXX`。
+#' Disconnects all DBI connections found in the global environment.
+#' This is a general implementation that works with any DBI-compliant database.
+#' For database-specific optimizations (like DuckDB export/backup operations), 
+#' see the corresponding functions in specific subdirectories.
 #'
-#' 匯出成功後，以 `file.rename()` 取代舊檔；可選擇是否保留備份及舊 `.wal`。
-#' 若連線為唯讀模式，將僅斷線而不進行匯出/複製。
+#' @param verbose Logical. Display progress messages (default: TRUE)
+#' @param remove_vars Logical. Remove connection variables after disconnect (default: TRUE)
+#' @param skip_patterns Character vector. Variable name patterns to skip (default: c("db_path_list", "^\\.", "^temp_"))
 #'
-#' @param verbose        顯示進度 (TRUE)
-#' @param remove_vars    斷線後移除變數 (TRUE)
-#' @param create_backups 建立備份 (TRUE)
-#' @param keep_backups   覆蓋成功後保留備份？(FALSE)
-#' @param cleanup_wal    刪除舊 `.wal`？(TRUE)
-#' @param backup_suffix  備份後綴字串 ("_bak")
-#' @param export_dir     暫存匯出資料夾 (`tempdir()`)
-#' @return Integer — 成功斷開的連線數。
+#' @return Integer. Number of connections successfully disconnected.
+#'
+#' @details
+#' This function scans the global environment for DBI connection objects and
+#' disconnects them safely. It:
+#' 1. Identifies all valid DBI connections in .GlobalEnv
+#' 2. Attempts to disconnect each connection
+#' 3. Optionally removes the connection variables
+#' 4. Reports success/failure counts
+#'
+#' For DuckDB databases requiring export/backup functionality, use
+#' duckdb/fn_duckdb_disconnect_with_export.R instead.
+#'
+#' @examples
+#' \dontrun{
+#' # Connect to various databases
+#' pg_con <- DBI::dbConnect(RPostgres::Postgres(), ...)
+#' sqlite_con <- DBI::dbConnect(RSQLite::SQLite(), ...)
+#' 
+#' # Disconnect all
+#' dbDisconnect_all()
+#' 
+#' # Disconnect but keep variables
+#' dbDisconnect_all(remove_vars = FALSE)
+#' }
 #'
 #' @export
-
-.duckdb_supports_export <- function() {
-  ver <- tryCatch(numeric_version(duckdb::duckdb_version()), error = function(e) "0.0.0")
-  ver >= "0.9.0"
-}
-
-.get_catalog_name <- function(con) {
-  res <- DBI::dbGetQuery(con, "PRAGMA database_list;")
-  if (nrow(res)) res$name[1] else "memory"
-}
-
-.random_alias <- function() paste0("db_", substr(gsub("-", "", uuid::UUIDgenerate()), 1, 8))
-
-# Define null-coalescing operator if not already available
-if (!exists("%||%")) {
-  `%||%` <- function(a, b) if (is.null(a)) b else a
-}
-
-# main -------------------------------------------------------------------------
-dbDisconnect_all <- function(verbose        = TRUE,
-                             remove_vars    = TRUE,
-                             create_backups = TRUE,
-                             keep_backups   = FALSE,
-                             cleanup_wal    = TRUE,
-                             backup_suffix  = "_bak",
-                             export_dir     = tempdir()) {
-  dir.create(export_dir, showWarnings = FALSE, recursive = TRUE)
-  objs <- ls(envir = .GlobalEnv)
-  ok_n <- fail_n <- 0L
-  export_supported <- .duckdb_supports_export()
+#' @seealso duckdb/fn_duckdb_disconnect_with_export.R for DuckDB-specific features
+dbDisconnect_all <- function(verbose = TRUE, 
+                            remove_vars = TRUE,
+                            skip_patterns = c("db_path_list", "^\\.", "^temp_")) {
   
-  for (nm in objs) {
-    if (nm == "db_path_list" || startsWith(nm, ".")) next
+  # Get all objects in global environment
+  all_objects <- ls(envir = .GlobalEnv)
+  
+  # Filter out objects matching skip patterns
+  objects_to_check <- all_objects
+  for (pattern in skip_patterns) {
+    objects_to_check <- objects_to_check[!grepl(pattern, objects_to_check)]
+  }
+  
+  if (verbose && length(objects_to_check) > 0) {
+    message("Scanning ", length(objects_to_check), " objects for DBI connections...")
+  }
+  
+  success_count <- 0L
+  failure_count <- 0L
+  connection_vars <- character(0)
+  
+  # Check each object for DBI connection
+  for (var_name in objects_to_check) {
+    obj <- tryCatch(
+      get(var_name, envir = .GlobalEnv), 
+      error = function(e) NULL
+    )
     
-    con <- tryCatch(get(nm, .GlobalEnv), error = function(e) NULL)
-    if (is.null(con) || !inherits(con, "DBIConnection") || !DBI::dbIsValid(con)) next
-    
-    is_duck <- inherits(con, "duckdb_connection")
-    db_path <- if (is_duck) DBI::dbGetInfo(con)$dbname else NA_character_
-    export_success <- !is_duck
-    bak <- NULL
-    read_only <- FALSE
-    if (is_duck) {
-      read_only <- tryCatch({
-        # Check connection info for read-only status
-        info <- DBI::dbGetInfo(con)
-        # Try multiple ways to detect read-only mode
-        isTRUE(con@driver@read_only) || 
-        grepl("read.only", tolower(info$dbname), fixed = TRUE) ||
-        tryCatch({
-          # Test if we can create a temporary table
-          dbExecute(con, "CREATE TEMP TABLE __test_readonly__ AS SELECT 1")
-          dbExecute(con, "DROP TABLE __test_readonly__")
-          FALSE  # If we can create/drop, it's not read-only
-        }, error = function(e) {
-          # If we can't create a temp table, it might be read-only
-          grepl("read.only", e$message, ignore.case = TRUE)
-        })
-      }, error = function(e) FALSE)
-    }
-
-    if (is_duck && !is.na(db_path) && !read_only) {
-      tmp <- file.path(export_dir, paste0(tools::file_path_sans_ext(basename(db_path)), "_export.duckdb"))
-      if (file.exists(tmp)) file.remove(tmp)
-      
-      # 1️⃣ EXPORT DATABASE
-      if (export_supported) {
-        sql <- sprintf("EXPORT DATABASE '%s' (FORMAT duckdb);", tmp)
-        export_success <- tryCatch({DBI::dbExecute(con, sql); TRUE}, error = function(e) {
-          if (verbose) message("EXPORT DATABASE 失敗: ", e$message)
-          FALSE
-        })
-      }
-      # 2️⃣ fallback COPY
-      if (!export_success) {
-        alias <- .random_alias()
-        src   <- DBI::dbQuoteIdentifier(con, .get_catalog_name(con))
-        sql <- sprintf(
-          "DETACH DATABASE IF EXISTS %s; ATTACH '%s' AS %s; COPY FROM DATABASE %s TO %s; DETACH DATABASE %s;",
-          alias, tmp, alias, src, alias, alias)
-        export_success <- tryCatch({DBI::dbExecute(con, sql); TRUE}, error = function(e) {
-          if (verbose) message("COPY FROM DATABASE 失敗: ", e$message)
-          FALSE
-        })
-      }
-      if (!export_success && verbose) warning("無法匯出 '", nm, "'，已跳過取代流程")
-    } else if (is_duck && read_only) {
-      export_success <- TRUE
-      if (verbose) message("'", nm, "' 為唯讀連線，略過匯出/複製程序")
+    # Skip if not a valid DBI connection
+    if (is.null(obj) || !inherits(obj, "DBIConnection") || !DBI::dbIsValid(obj)) {
+      next
     }
     
-    # 斷線 --------------------------------------------------------------------
-    disconnect_result <- tryCatch({
-      # 先 detach 所有附加的資料庫
-      if (is_duck) {
-        # 調用 dbDetach_all 來清理附加的資料庫
-        tryCatch({
-          if (exists("dbDetach_all")) {
-            dbDetach_all(con, verbose = verbose)
-          }
-        }, error = function(e) {
-          if (verbose) message("Error detaching databases before disconnect: ", e$message)
-        })
+    connection_vars <- c(connection_vars, var_name)
+    
+    # Attempt to disconnect
+    disconnect_success <- tryCatch({
+      DBI::dbDisconnect(obj)
+      if (verbose) {
+        db_info <- tryCatch(DBI::dbGetInfo(obj), error = function(e) list(dbname = "unknown"))
+        message("Disconnected: ", var_name, " (", class(obj)[1], ")")
       }
-      
-      # 然後斷開主連線
-      DBI::dbDisconnect(con)
-      if (verbose && read_only) message("已斷開唯讀連線: ", nm)
       TRUE
     }, error = function(e) {
-      if (verbose) message("斷開連線失敗 '", nm, "': ", e$message)
+      if (verbose) {
+        message("Failed to disconnect '", var_name, "': ", e$message)
+      }
       FALSE
     })
     
-    # 取代 & 清理 -------------------------------------------------------------
-    if (is_duck && export_success && !read_only && !is.null(tmp) && file.exists(tmp)) {
-      if (create_backups) {
-        bak <- paste0(db_path, backup_suffix, format(Sys.time(), "%Y%m%d_%H%M%S"))
-        file.copy(db_path, bak, overwrite = FALSE)
-        if (verbose) message("備份至 ", bak)
-      }
-      file.rename(tmp, db_path)
-      if (verbose) message("已以匯出檔取代: ", basename(db_path))
+    # Update counters
+    if (disconnect_success) {
+      success_count <- success_count + 1L
       
-      # 刪備份
-      if (!keep_backups && !is.null(bak) && file.exists(bak)) {
-        file.remove(bak)
-        if (verbose) message("已刪除備份檔: ", basename(bak))
+      # Remove variable if requested
+      if (remove_vars) {
+        tryCatch({
+          rm(list = var_name, envir = .GlobalEnv)
+          if (verbose) message("Removed variable: ", var_name)
+        }, error = function(e) {
+          if (verbose) message("Failed to remove variable '", var_name, "': ", e$message)
+        })
       }
-      # 刪舊 WAL
-      if (cleanup_wal) {
-        old_wal <- sub("\\.duckdb$", ".duckdb.wal", bak %||% db_path)
-        if (file.exists(old_wal)) {
-          file.remove(old_wal)
-          if (verbose) message("已刪除舊 WAL: ", basename(old_wal))
-        }
-      }
-    }
-    
-    # tally -------------------------------------------------------------------
-    if (disconnect_result) {
-      ok_n <- ok_n + 1L
-      if (remove_vars) rm(list = nm, envir = .GlobalEnv)
     } else {
-      fail_n <- fail_n + 1L
+      failure_count <- failure_count + 1L
     }
   }
   
-  if (verbose) message("成功斷開 ", ok_n, " 個；失敗 ", fail_n, " 個。")
-  invisible(ok_n)
+  # Summary message
+  total_found <- length(connection_vars)
+  if (verbose) {
+    if (total_found == 0) {
+      message("No DBI connections found in global environment")
+    } else {
+      message(sprintf("Connection summary: %d found, %d disconnected, %d failed", 
+                     total_found, success_count, failure_count))
+    }
+  }
+  
+  invisible(success_count)
+}
+
+#' Close Specific Database Connection
+#'
+#' Safely disconnect a specific DBI connection with error handling.
+#'
+#' @param con DBI connection object
+#' @param con_name Character. Name for the connection (for messages)
+#' @param verbose Logical. Display messages
+#'
+#' @return Logical. TRUE if successful, FALSE otherwise
+#'
+#' @export
+dbDisconnect_safe <- function(con, con_name = "connection", verbose = TRUE) {
+  if (is.null(con) || !inherits(con, "DBIConnection")) {
+    if (verbose) message("Not a valid DBI connection: ", con_name)
+    return(FALSE)
+  }
+  
+  if (!DBI::dbIsValid(con)) {
+    if (verbose) message("Connection already invalid: ", con_name)
+    return(TRUE)  # Consider this success since it's already disconnected
+  }
+  
+  result <- tryCatch({
+    DBI::dbDisconnect(con)
+    if (verbose) message("Successfully disconnected: ", con_name)
+    TRUE
+  }, error = function(e) {
+    if (verbose) message("Failed to disconnect '", con_name, "': ", e$message)
+    FALSE
+  })
+  
+  return(result)
+}
+
+#' List All DBI Connections in Environment
+#'
+#' Scan and list all DBI connections in the global environment.
+#'
+#' @param envir Environment to scan (default: .GlobalEnv)
+#' @param include_invalid Logical. Include invalid/closed connections
+#'
+#' @return Data frame with connection information
+#'
+#' @export
+list_dbi_connections <- function(envir = .GlobalEnv, include_invalid = FALSE) {
+  all_objects <- ls(envir = envir)
+  connections <- data.frame(
+    variable = character(0),
+    class = character(0),
+    valid = logical(0),
+    database = character(0),
+    stringsAsFactors = FALSE
+  )
+  
+  for (var_name in all_objects) {
+    obj <- tryCatch(get(var_name, envir = envir), error = function(e) NULL)
+    
+    if (is.null(obj) || !inherits(obj, "DBIConnection")) next
+    
+    is_valid <- DBI::dbIsValid(obj)
+    
+    if (!include_invalid && !is_valid) next
+    
+    # Get database info
+    db_name <- tryCatch({
+      info <- DBI::dbGetInfo(obj)
+      info$dbname %||% info$dbdir %||% "unknown"
+    }, error = function(e) "unknown")
+    
+    connections <- rbind(connections, data.frame(
+      variable = var_name,
+      class = class(obj)[1],
+      valid = is_valid,
+      database = db_name,
+      stringsAsFactors = FALSE
+    ))
+  }
+  
+  return(connections)
 }

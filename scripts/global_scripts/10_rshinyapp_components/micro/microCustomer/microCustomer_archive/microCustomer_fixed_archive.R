@@ -126,10 +126,10 @@ microCustomerFilterUI <- function(id, translate = function(x) x) {
         closeAfterSelect = TRUE,
         searchField = c("name", "email"),
         render = I("{
-          option: function(product, escape) {
+          option: function(item, escape) {
             return '<div>' +
-              '<strong>' + escape(product.name) + '</strong><br>' +
-              '<small>' + escape(product.email) + '</small>' +
+              '<strong>' + escape(item.name) + '</strong><br>' +
+              '<small>' + escape(item.email) + '</small>' +
             '</div>';
           }
         }")

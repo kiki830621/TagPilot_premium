@@ -17,7 +17,7 @@
 #   • Competitive Set Analysis (CSA) with MDS visualization
 #   • Interactive scatter plot with cluster grouping
 #   • Brand differentiation with shapes and colors
-#   • Hover information with brand and product ID details
+#   • Hover information with brand and Product ID details
 #   • Dynamic clustering and positioning analysis
 #   • AI Market Segmentation Analysis Report generation
 # -----------------------------------------------------------------------------
@@ -706,17 +706,17 @@ positionMSPlotlyServer <- function(id, app_data_connection = NULL, config = NULL
       identical(current_tab, "positionMS")
     })
     
-    # ------------ Get OpenAI API key from app_configs --------------
-    gpt_key <- if (exists("app_configs") && !is.null(app_configs$OPENAI_API_KEY)) {
-      key <- app_configs$OPENAI_API_KEY
+    # ------------ Get OpenAI API key from environment --------------
+    gpt_key <- Sys.getenv("OPENAI_API_KEY", "")
+    
+    if (nzchar(gpt_key)) {
       # Basic validation of API key format
-      if (!grepl("^sk-", key)) {
+      if (!grepl("^sk-", gpt_key)) {
         warning("OpenAI API key format appears incorrect. Should start with 'sk-'")
       }
-      key
     } else {
-      warning("OpenAI API key not found in app_configs. AI analysis features will be disabled.")
-      NULL
+      warning("OpenAI API key not found in environment. AI analysis features will be disabled.")
+      gpt_key <- NULL
     }
     
     # ------------ Status tracking ----------------------------------
@@ -801,15 +801,26 @@ positionMSPlotlyServer <- function(id, app_data_connection = NULL, config = NULL
         # Check if product_id column exists, if not try to find platform-specific column
         if (!"product_id" %in% names(filtered_data) && nrow(filtered_data) > 0) {
           platform <- platform_id()
-          product_col <- switch(platform,
+
+          # Ensure platform is a scalar value for switch statement
+          if (is.null(platform) || length(platform) == 0) {
+            platform <- "default"
+          } else if (length(platform) > 1) {
+            warning("platform_id() returned multiple values, using first: ", paste(platform, collapse=", "))
+            platform <- as.character(platform[1])
+          } else {
+            platform <- as.character(platform)
+          }
+
+          item_col <- switch(platform,
             "2" = "asin",  # Amazon
-            "3" = "ebay_product_number",  # eBay
+            "3" = "ebay_item_number",  # eBay
             "product_id"  # Default fallback
           )
           
-          if (product_col %in% names(filtered_data)) {
-            message("DEBUG: Renaming '", product_col, "' to 'product_id' in positionMSPlotly")
-            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(product_col))
+          if (item_col %in% names(filtered_data)) {
+            message("DEBUG: Renaming '", item_col, "' to 'product_id' in positionMSPlotly")
+            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(item_col))
           } else {
             warning("No product identifier column found in MS position data. Available columns: ", paste(names(filtered_data), collapse = ", "))
             component_status("error")
@@ -1031,7 +1042,7 @@ positionMSPlotlyServer <- function(id, app_data_connection = NULL, config = NULL
         hover_text <- character(nrow(data))
         
         for (i in 1:nrow(data)) {
-          # Get current product's group and revenue
+          # Get current item's group and revenue
           current_group <- data$group[i]
           current_revenue <- 0
           
@@ -1062,7 +1073,7 @@ positionMSPlotlyServer <- function(id, app_data_connection = NULL, config = NULL
                                           0)
           
           hover_text[i] <- paste('Brand:', data$brand[i], 
-                               '<br>product ID:', data$product_id[i],
+                               '<br>Product ID:', data$product_id[i],
                                '<br>Market Share in Segment:', market_share_in_segment, '%')
         }
       } else {
@@ -1209,11 +1220,11 @@ positionMSPlotlyServer <- function(id, app_data_connection = NULL, config = NULL
       if (!is.null(app_brand_name) && !is.null(csa) && "brand" %in% names(csa)) {
         app_brand_data <- csa %>% dplyr::filter(brand == app_brand_name)
         if (nrow(app_brand_data) > 0) {
-          # Get unique clusters for all product IDs of this brand
+          # Get unique clusters for all Product IDs of this brand
           app_brand_clusters <- unique(as.numeric(app_brand_data$group))
           app_brand_product_id_count <- nrow(app_brand_data)
           
-          # Sum revenue across all product IDs
+          # Sum revenue across all Product IDs
           if ("revenue" %in% names(app_brand_data)) {
             app_brand_revenue <- sum(app_brand_data$revenue, na.rm = TRUE)
           } else if ("sales" %in% names(app_brand_data)) {
@@ -1294,7 +1305,7 @@ positionMSPlotlyServer <- function(id, app_data_connection = NULL, config = NULL
                                  round(app_brand_revenue / total_market_revenue * 100, 1), 
                                  0)
         
-        # Calculate average revenue per product ID
+        # Calculate average revenue per Product ID
         app_brand_avg_revenue <- ifelse(app_brand_product_id_count > 0, 
                                        app_brand_revenue / app_brand_product_id_count, 
                                        0)
@@ -1305,9 +1316,9 @@ positionMSPlotlyServer <- function(id, app_data_connection = NULL, config = NULL
                               paste0("(Part of ", paste(cluster_names, collapse = ", "), ")"),
                               paste0("(Part of ", cluster_names[1], ")"))
         
-        # Add product ID count info if multiple product IDs
+        # Add Product ID count info if multiple Product IDs
         product_id_info <- ifelse(app_brand_product_id_count > 1, 
-                           paste0(" - ", app_brand_product_id_count, " product IDs"), 
+                           paste0(" - ", app_brand_product_id_count, " Product IDs"), 
                            "")
         
         if (has_revenue) {
@@ -1463,27 +1474,30 @@ positionMSPlotlyServer <- function(id, app_data_connection = NULL, config = NULL
     
     # Display component status
     output$component_status <- renderText({
-      if (product_line_id() == "all") {
-        return("Please select a specific product line for competitive analysis")
+      # MP031: Defensive programming - check for NULL/empty values before switch
+      # R113: Error handling for reactive expressions
+      status_val <- tryCatch({
+        component_status()
+      }, error = function(e) {
+        warning("Error getting component status: ", e$message)
+        "idle"
+      })
+
+      # MP099: Defensive check for NULL or empty status
+      if (is.null(status_val) || length(status_val) == 0 || status_val == "") {
+        return("Ready for position analysis")
       }
-      
-      csa <- csa_result()
-      
-      if (component_status() == "ready" && !is.null(csa)) {
-        n_clusters <- length(unique(csa$clusters))
-        ai_status <- if (is.null(gpt_key)) " - AI naming disabled (no API key)" else " - AI naming enabled"
-        return(paste0("CSA analysis complete: ", csa$n_observations, " products, ", 
-                     csa$n_variables, " variables, ", n_clusters, " clusters (stress: ", 
-                     round(csa$stress, 3), ")", ai_status))
-      }
-      
-      switch(component_status(),
-             idle = "Ready for competitive analysis",
+
+      # Ensure status_val is character and length 1 for switch
+      status_val <- as.character(status_val)[1]
+
+      switch(status_val,
+             idle = "Ready for position analysis",
              loading = "Loading position data...",
-             ready = paste0("Analysis ready with ", nrow(position_data()), " competitors"),
-             computing = "Computing CSA analysis...",
-             error = "Error: Try adjusting data quality threshold or check data availability",
-             component_status())
+             ready = paste0("Position data loaded: ", nrow(position_data()), " records"),
+             computing = "Computing position metrics...",
+             error = "Error loading position data",
+             status_val)  # Default: return the status value itself
     })
     
     # ---- AI Market Segmentation Analysis Report --------------------------------

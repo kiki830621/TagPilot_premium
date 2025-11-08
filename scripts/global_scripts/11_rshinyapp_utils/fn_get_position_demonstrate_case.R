@@ -44,16 +44,37 @@ fn_get_position_demonstrate_case <- function(
   
   # Start with base query
   tbl <- tbl2(app_data_connection, "df_position")
-  
+
   # Apply product line filter if not "all"
   if (product_line_id != "all") {
     message("🔍 Applying product_line filter: ", product_line_id)
     tbl <- tbl %>% dplyr::filter(product_line_id == !!product_line_id)
   }
-  
+
+  # MP031: Defensive Programming - Check for item_id column and rename to product_id
+  # R113: Proper error handling for column renaming
+  # The df_position table uses item_id as the product identifier, not product_id
+  tbl_collected <- tbl %>% dplyr::collect()
+
+  if ("item_id" %in% names(tbl_collected) && !"product_id" %in% names(tbl_collected)) {
+    message("📦 Renaming item_id to product_id for consistency")
+    tbl_collected <- tbl_collected %>% dplyr::rename(product_id = item_id)
+  } else if (!"product_id" %in% names(tbl_collected) && !"item_id" %in% names(tbl_collected)) {
+    warning("⚠️ No product identifier column found (neither product_id nor item_id)")
+  }
+
+  # Now use tbl_collected for further processing
+  tbl <- tbl_collected
+
   # ALWAYS exclude special rows for demonstrate case
   message("🚫 Excluding special rows for demonstrate case: Ideal, Rating, Revenue")
-  tbl <- tbl %>% dplyr::filter(!product_id %in% c("Ideal", "Rating", "Revenue"))
+  # MP031: Defensive programming for product_id column
+  if ("product_id" %in% names(tbl)) {
+    tbl <- tbl %>% dplyr::filter(!product_id %in% c("Ideal", "Rating", "Revenue"))
+  } else if ("item_id" %in% names(tbl)) {
+    # Fallback if renaming didn't work
+    tbl <- tbl %>% dplyr::filter(!item_id %in% c("Ideal", "Rating", "Revenue"))
+  }
   
   # Apply type filtering if requested
   if (apply_type_filter && length(type_values) > 0) {
@@ -91,55 +112,56 @@ fn_get_position_demonstrate_case <- function(
                 if(length(attr_cols) > 10) paste(" ... and", length(attr_cols) - 10, "more") else "")
         
         tbl <- collected_data %>% dplyr::select(dplyr::all_of(cols_to_keep))
-      }
-      
-      if (product_line_id != "all") {
-        property_tbl <- property_tbl %>% 
-          dplyr::filter(product_line_id == !!product_line_id)
-      }
-      
-      # Get attributes to keep (type = "屬性") - collect the property data first
-      property_data <- property_tbl %>% dplyr::collect()
-      
-      attributes_to_keep <- property_data %>%
-        dplyr::filter(type %in% !!type_values) %>%
-        dplyr::pull(attributes) %>%
-        unique()
-      
-      if (length(attributes_to_keep) > 0) {
-        # Convert to clean names for column matching
-        clean_attr_names <- make_names(attributes_to_keep)
-        
-        # Collect all data first for column inspection
-        collected_data <- tbl %>% dplyr::collect()
-        
-        # Find columns that match our attributes
-        all_cols <- colnames(collected_data)
-        essential_cols <- c("product_id", "brand", "product_line_id", "rating", "sales")
-        attr_cols <- intersect(clean_attr_names, all_cols)
-        
-        # Select essential columns + matched attribute columns
-        cols_to_keep <- unique(c(essential_cols, attr_cols))
-        cols_to_keep <- intersect(cols_to_keep, all_cols)  # Ensure all exist
-        
-        message("✨ Keeping ", length(attr_cols), " attribute columns out of ", 
-                length(attributes_to_keep), " total attributes")
-        message("🔧 Essential columns: ", paste(essential_cols, collapse = ", "))
-        message("📊 Attribute columns: ", paste(attr_cols, collapse = ", "))
-        
-        # Apply column selection
-        if (length(cols_to_keep) > 0) {
-          collected_data <- collected_data %>% 
-            dplyr::select(dplyr::all_of(cols_to_keep))
+      } else {
+        # property_tbl is not NULL, proceed with filtering
+        if (product_line_id != "all") {
+          property_tbl <- property_tbl %>% 
+            dplyr::filter(product_line_id == !!product_line_id)
         }
         
-        # Convert back to tbl for consistency
-        tbl <- collected_data
+        # Get attributes to keep (type = "屬性") - collect the property data first
+        property_data <- property_tbl %>% dplyr::collect()
         
-      } else {
-        message("⚠️ No attributes found with type = '屬性' for product line: ", product_line_id)
-        # Still collect the data for further processing
-        tbl <- tbl %>% dplyr::collect()
+        attributes_to_keep <- property_data %>%
+          dplyr::filter(type %in% !!type_values) %>%
+          dplyr::pull(attributes) %>%
+          unique()
+        
+        if (length(attributes_to_keep) > 0) {
+          # Convert to clean names for column matching
+          clean_attr_names <- make_names(attributes_to_keep)
+          
+          # Collect all data first for column inspection
+          collected_data <- tbl %>% dplyr::collect()
+          
+          # Find columns that match our attributes
+          all_cols <- colnames(collected_data)
+          essential_cols <- c("product_id", "brand", "product_line_id", "rating", "sales")
+          attr_cols <- intersect(clean_attr_names, all_cols)
+          
+          # Select essential columns + matched attribute columns
+          cols_to_keep <- unique(c(essential_cols, attr_cols))
+          cols_to_keep <- intersect(cols_to_keep, all_cols)  # Ensure all exist
+          
+          message("✨ Keeping ", length(attr_cols), " attribute columns out of ", 
+                  length(attributes_to_keep), " total attributes")
+          message("🔧 Essential columns: ", paste(essential_cols, collapse = ", "))
+          message("📊 Attribute columns: ", paste(attr_cols, collapse = ", "))
+          
+          # Apply column selection
+          if (length(cols_to_keep) > 0) {
+            collected_data <- collected_data %>% 
+              dplyr::select(dplyr::all_of(cols_to_keep))
+          }
+          
+          # Convert back to tbl for consistency
+          tbl <- collected_data
+          
+        } else {
+          message("⚠️ No attributes found with type = '屬性' for product line: ", product_line_id)
+          # Still collect the data for further processing
+          tbl <- tbl %>% dplyr::collect()
+        }
       }
       
     }, error = function(e) {

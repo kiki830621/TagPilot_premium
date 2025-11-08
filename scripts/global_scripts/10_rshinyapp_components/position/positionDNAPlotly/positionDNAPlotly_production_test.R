@@ -85,7 +85,7 @@ ui <- bs4DashPage(
   sidebar = bs4DashSidebar(status="primary", width="300px", elevation = 3, minified = FALSE,
                            sidebarMenu(id="sidebar_menu",
                                        bs4SidebarHeader("Application Settings"),
-                                       bs4SidebarMenuproduct("DNA Visualization", tabName="dna_plot", icon=icon("chart-line")) ),
+                                       bs4SidebarMenuItem("DNA Visualization", tabName="dna_plot", icon=icon("chart-line")) ),
                            # Shared Platform and Product Line Filters
                            div(class="sidebar-section p-3 mt-2",
                                h5("Platform", class="mb-3"),
@@ -110,8 +110,8 @@ ui <- bs4DashPage(
                            uiOutput("dynamic_filter") ),
   
   body = bs4DashBody(css_deps, useShinyjs(),
-                     bs4Tabproducts(
-                       bs4Tabproduct(tabName="dna_plot", 
+                     bs4TabItems(
+                       bs4TabItem(tabName="dna_plot", 
                                  fluidRow(
                                    column(12, 
                                           bs4Card(title="Brand DNA Visualization", 

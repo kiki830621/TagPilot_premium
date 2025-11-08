@@ -1,0 +1,14 @@
+# External documentation clones (managed separately)
+technical_docs/
+technical_docs/duckdb-web/
+technical_docs/LAST_UPDATE.txt
+
+# Other external references that should not be tracked
+*.pdf
+*.epub
+*.md
+external_downloads/
+
+# Temporary files
+*.tmp
+.DS_Store

@@ -1,0 +1,38 @@
+
+==== DEBUG REPORT GENERATION START ====
+[2025-09-28 14:20:28.428566] Initializing debugging session
+[INFO] Changed to project root: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA
+[ERROR] autoinit failed: cannot open the connection
+Warning message:
+In file(filename, "r", encoding = encoding) :
+  cannot open file 'scripts/global_scripts/00_principles/autoinit_prod.R': No such file or directory
+
+[MAIN] Starting report generation debugging
+
+[STEP 1] Checking database connection...
+[ERROR] Database check failed: could not find function "dbConnect"
+
+[STEP 2] Loading report integration module...
+[SUCCESS] Report integration module loaded
+[INFO] reportIntegrationServer function exists
+[INFO] reportIntegrationComponent function exists
+
+[STEP 3] Checking OpenAI API configuration...
+[WARNING] OpenAI API key not configured
+
+[STEP 4] Checking AI functions...
+[SUCCESS] fn_chat_api.R loaded
+[INFO] fn_chat_api function is available
+
+[TEST] Testing self-contained data fetching...
+[ERROR] Test queries failed: could not find function "dbConnect"
+
+[TEST 4] Testing report HTML generation...
+[SUCCESS] HTML generated (length: 4129 characters)
+
+[DEINIT] Cleaning up...
+>> De-init completed ‒ GlobalEnv 已清空並重建薄殼
+
+==== DEBUG REPORT GENERATION COMPLETE ====
+[2025-09-28 14:20:28.469677] Debug session ended
+[INFO] Waiting 5 seconds for output capture...

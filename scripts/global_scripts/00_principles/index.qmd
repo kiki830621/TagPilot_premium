@@ -1,92 +1,62 @@
----
-title: "AI MarTech Development Principles"
-subtitle: "A Comprehensive Framework for Principle-Driven Development"
-author: "AI MarTech Development Team"
-date: today
-format:
-  html:
-    toc: true
-    toc-depth: 2
----
+# MAMBA Principles Documentation
 
-# AI MarTech Development Principles
+## Overview
 
-Welcome to the comprehensive framework for principle-driven development in the AI MarTech ecosystem. This documentation system provides structured guidance for building robust, maintainable, and scalable applications.
+This documentation contains the comprehensive principles system for the MAMBA (Marketing Analytics and Business Automation) platform. The principles are organized into two language versions to serve different audiences and development contexts.
 
-## Overview {#sec-overview}
+## Language Versions
 
-This principles framework consists of four main categories:
+### English Version
+The English version contains the original principles as they were developed, maintaining the technical terminology and concepts in their source language. This version is recommended for:
 
-::: {.callout-note}
+- International collaboration
+- Technical documentation sharing
+- Academic research and publication
+- Integration with external systems and frameworks
+
+### 中文版本 (Chinese Version)
+The Chinese version provides localized translations with cultural and linguistic adaptations appropriate for Chinese-speaking development teams. This version includes:
+
+- Cultural context adaptations
+- Localized examples and use cases
+- Chinese technical terminology
+- Region-specific implementation considerations
+
 ## Principle Categories
 
-- **Meta Principles (MP)**: Foundational architectural principles that guide system design
-- **Principles (P)**: Implementation principles for specific development practices  
-- **Rules (R)**: Concrete implementation rules and coding standards
-- **Derivations (D)**: Specific data processing workflows and methodologies
-:::
+Both language versions are organized into five main categories:
 
-## Quick Navigation
+### 1. General Principles (總綱)
+Foundational principles that establish the overall system architecture and philosophical approach.
 
-### Core Meta Principles
+### 2. Structure & Organization (結構與組織)
+Principles governing how code, modules, and systems should be structured and organized.
 
-- @MP018 - Don't Repeat Yourself: Eliminates code duplication
-- @MP044 - Functor-Module Correspondence: Maps language commands to code modules
-- @MP000 - Axiomatization System: Foundational principle system
+### 3. Development Methodology (開發方法論)
+Guidelines for development processes, testing, deployment, and maintenance practices.
 
-### Key Implementation Rules
+### 4. Data Management (資料管理)
+Principles for data handling, storage, processing, and flow management.
 
-- @R067 - Functional Encapsulation: Extracts reusable functions
-- @R021 - One Function One File: Organizes code modularity
-- @R114 - Standard Path Constants: Unified path management system
+### 5. Terminology & Standards (術語與標準)
+Standardization of language, naming conventions, and communication protocols.
 
-### Data Processing Workflows
+## Navigation
 
-- @D01 - DNA Analysis: Customer behavior analysis pipeline
-- @D02 - Customer Filtering: Multi-dimensional customer view creation
+Use the navigation panel on the left to browse between:
+- Language versions (English/中文)
+- Principle categories
+- Individual principle documents
 
-## Current Focus: Addressing Code Duplication
+Each principle includes:
+- Core statement and rationale
+- Implementation guidelines
+- Code examples
+- Relationship to other principles
+- Verification methods
 
-Recent analysis has identified significant code duplication in the D-series derivations, particularly between @D01 and @D02. The recommended solution involves:
+## Development Status
 
-1. **Applying @MP018** (Don't Repeat Yourself) to eliminate duplicate processing steps
-2. **Implementing @MP044** (Functor-Module Correspondence) to create unified data processing modules  
-3. **Using @R067** (Functional Encapsulation) to extract shared functions
+This documentation is actively maintained and updated as the MAMBA platform evolves. Recent additions include enhanced bilingual support and improved cross-referencing between related principles.
 
-See @sec-d-series-refactoring for detailed refactoring guidance.
-
-## Cross-Reference System
-
-This documentation uses a comprehensive cross-reference system that enables:
-
-- **Semantic linking**: `@MP018` automatically links to the DRY principle
-- **Hierarchical navigation**: Understanding principle dependencies and relationships
-- **AI-friendly structure**: Enhanced readability for automated analysis and suggestions
-
-## Recent Updates
-
-- **2025-07-12**: Converted core principles to QMD format for better cross-referencing
-- **2025-07-12**: Identified and documented D-series code duplication issues
-- **2025-07-12**: Added automated cross-reference system for principle relationships
-
-## Getting Started
-
-For new developers:
-
-1. Start with @MP000 to understand the axiomatization system
-2. Review @MP018 for code organization principles  
-3. Study the D-series derivations for practical examples
-4. Use the search functionality to find relevant principles for specific scenarios
-
-## Contributing
-
-When adding new principles:
-
-1. Follow the established naming convention (MP/P/R/D + sequential number)
-2. Include proper cross-references to related principles
-3. Add examples demonstrating practical application
-4. Update the navigation structure in `_quarto.yml`
-
----
-
-*This documentation is continuously updated to reflect evolving best practices and lessons learned from implementation experience.*
+For questions or contributions, please refer to the development team or submit issues through the established channels.

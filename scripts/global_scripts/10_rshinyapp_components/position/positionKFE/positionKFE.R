@@ -45,8 +45,8 @@ perform_kfe_analysis <- function(data, exclude_vars = NULL, threshold_multiplier
     # Try common platform-specific columns
     if ("asin" %in% names(data)) {
       data <- data %>% dplyr::rename(product_id = asin)
-    } else if ("ebay_product_number" %in% names(data)) {
-      data <- data %>% dplyr::rename(product_id = ebay_product_number)
+    } else if ("ebay_item_number" %in% names(data)) {
+      data <- data %>% dplyr::rename(product_id = ebay_item_number)
     } else {
       warning("No product identifier column found in KFE analysis data")
       return(list(
@@ -129,14 +129,14 @@ perform_kfe_analysis <- function(data, exclude_vars = NULL, threshold_multiplier
       factor_indices <- which(indicators[[factor]] == 1)
       
       if (length(factor_indices) > 0) {
-        # Get product IDs for those indices, filtering out NA values
-        benchmark_product_ids <- df_no_ideal$product_id[factor_indices]
-        benchmark_product_ids <- benchmark_product_ids[!is.na(benchmark_product_ids)]
-        benchmark_product_ids <- unique(benchmark_product_ids)
+        # Get Product IDs for those indices, filtering out NA values
+        benchmark_item_ids <- df_no_ideal$product_id[factor_indices]
+        benchmark_item_ids <- benchmark_item_ids[!is.na(benchmark_item_ids)]
+        benchmark_item_ids <- unique(benchmark_item_ids)
         
-        # Only include if we have valid product IDs
-        if (length(benchmark_product_ids) > 0) {
-          benchmarks[[factor]] <- benchmark_product_ids
+        # Only include if we have valid Product IDs
+        if (length(benchmark_item_ids) > 0) {
+          benchmarks[[factor]] <- benchmark_item_ids
         }
       }
     }
@@ -176,7 +176,8 @@ format_key_factors <- function(factors) {
     stringr::str_replace_all("_", " ") %>%
     stringr::str_to_title()
   
-  paste(clean_factors, collapse = ", ")
+  # Use bullet points for better readability and wrapping
+  paste(paste("•", clean_factors), collapse = "\n")
 }
 
 # Filter UI -------------------------------------------------------------------
@@ -192,43 +193,17 @@ positionKFEFilterUI <- function(id, translate = identity) {
     style = "padding:15px;",
     h4(translate("Key Factor Analysis Settings")),
     
-    # Threshold multiplier
-    sliderInput(
-      inputId = ns("threshold_multiplier"),
-      label = translate("Analysis Sensitivity"),
-      min = 0.5,
-      max = 2.0,
-      value = 1.0,
-      step = 0.1
-    ),
-    
     # Display options
     hr(),
     h4(translate("Display Options")),
     
-    # Show detailed analysis
+    # Show benchmark products
     checkboxInput(
-      inputId = ns("show_details"),
-      label = translate("Show detailed factor analysis"),
+      inputId = ns("show_benchmarks"),
+      label = translate("Show Benchmark Products by Factor"),
       value = TRUE
     ),
     
-    # Show benchmarks
-    checkboxInput(
-      inputId = ns("show_benchmarks"),
-      label = translate("Show benchmark products"),
-      value = FALSE
-    ),
-    
-    # Maximum factors to display
-    sliderInput(
-      inputId = ns("max_factors"),
-      label = translate("Maximum factors to display"),
-      min = 3,
-      max = 15,
-      value = 8,
-      step = 1
-    ),
     
     # Reset button
     actionButton(
@@ -258,7 +233,9 @@ positionKFEDisplayUI <- function(id, translate = identity, mode = "full") {
           div(class = "kfe-main-output",
               h5(translate("Key Factors:")),
               div(class = "kfe-factors-display",
-                  verbatimTextOutput(ns("key_factors_text"))))
+                  style = "white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;",
+                  verbatimTextOutput(ns("key_factors_text")))
+          )
       )
     )
   } else {
@@ -269,15 +246,20 @@ positionKFEDisplayUI <- function(id, translate = identity, mode = "full") {
           p(translate("Automatic identification and analysis of critical success factors"))),
       div(class = "component-output p-3",
           div(class = "kfe-main-output",
-              h4(translate("Key Factors:")),
+              h4(translate("Key Factors")),
               div(class = "kfe-factors-display",
-                  verbatimTextOutput(ns("key_factors_text")))),
+                  style = "white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word;",
+                  verbatimTextOutput(ns("key_factors_text")))
+          ),
           conditionalPanel(
             condition = paste0("input['", ns("show_benchmarks"), "']"),
             div(class = "kfe-benchmarks mt-4",
-                h5(translate("Benchmark Products:")),
-                verbatimTextOutput(ns("benchmark_details")))
-          ))
+                h4(translate("Benchmark Products by Factor")),
+                div(style = "white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;",
+                    verbatimTextOutput(ns("benchmark_details")))
+            )
+          )
+      )
     )
   }
 }
@@ -368,15 +350,26 @@ positionKFEServer <- function(id, app_data_connection = NULL, config = NULL,
         # Check if product_id column exists, if not try to find platform-specific column
         if (!"product_id" %in% names(filtered_data) && nrow(filtered_data) > 0) {
           platform <- platform_id()
-          product_col <- switch(platform,
+
+          # Ensure platform is a scalar value for switch statement
+          if (is.null(platform) || length(platform) == 0) {
+            platform <- "default"
+          } else if (length(platform) > 1) {
+            warning("platform_id() returned multiple values, using first: ", paste(platform, collapse=", "))
+            platform <- as.character(platform[1])
+          } else {
+            platform <- as.character(platform)
+          }
+
+          item_col <- switch(platform,
             "2" = "asin",  # Amazon
-            "3" = "ebay_product_number",  # eBay
+            "3" = "ebay_item_number",  # eBay
             "product_id"  # Default fallback
           )
           
-          if (product_col %in% names(filtered_data)) {
-            message("DEBUG: Renaming '", product_col, "' to 'product_id' in positionKFE")
-            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(product_col))
+          if (item_col %in% names(filtered_data)) {
+            message("DEBUG: Renaming '", item_col, "' to 'product_id' in positionKFE")
+            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(item_col))
           } else {
             warning("No product identifier column found in KFE position data. Available columns: ", paste(names(filtered_data), collapse = ", "))
           }
@@ -403,12 +396,8 @@ positionKFEServer <- function(id, app_data_connection = NULL, config = NULL,
       # Define variables to exclude from KFE analysis
       exclude_vars <- c("product_line_id", "platform_id", "rating", "sales", "revenue")
       
-      # Use default values when in compact mode (no filter UI available)
-      threshold_mult <- if (display_mode == "compact") {
-        1.0  # Default threshold multiplier
-      } else {
-        input$threshold_multiplier %||% 1.0
-      }
+      # Always use default threshold multiplier of 1.0
+      threshold_mult <- 1.0
       
       result <- perform_kfe_analysis(
         data = data,
@@ -429,10 +418,7 @@ positionKFEServer <- function(id, app_data_connection = NULL, config = NULL,
     # Only set up reset observer in full mode
     if (display_mode == "full") {
       observeEvent(input$reset_filters, {
-        updateSliderInput(session, "threshold_multiplier", value = 1.0)
-        updateCheckboxInput(session, "show_details", value = TRUE)
-        updateCheckboxInput(session, "show_benchmarks", value = FALSE)
-        updateSliderInput(session, "max_factors", value = 8)
+        updateCheckboxInput(session, "show_benchmarks", value = TRUE)
         
         message("KFE settings reset")
       })
@@ -443,26 +429,11 @@ positionKFEServer <- function(id, app_data_connection = NULL, config = NULL,
       result <- kfe_result()
       
       if (is.null(result) || length(result$key_factors) == 0) {
-        return("No key factors identified. Try adjusting the analysis sensitivity.")
+        return("No key factors identified.")
       }
       
-      # Use default max_factors in compact mode
-      max_factors <- if (display_mode == "compact") {
-        8  # Default max factors
-      } else {
-        input$max_factors %||% 8
-      }
-      
-      # Limit the number of factors displayed
-      factors_to_show <- head(result$key_factors, max_factors)
-      
-      formatted_factors <- format_key_factors(factors_to_show)
-      
-      if (length(result$key_factors) > max_factors) {
-        formatted_factors <- paste0(formatted_factors, 
-                                  " (showing ", max_factors, " of ", 
-                                  length(result$key_factors), " factors)")
-      }
+      # Show all factors without limitation
+      formatted_factors <- format_key_factors(result$key_factors)
       
       return(formatted_factors)
     })
@@ -471,10 +442,10 @@ positionKFEServer <- function(id, app_data_connection = NULL, config = NULL,
       result <- kfe_result()
       
       if (is.null(result) || length(result$benchmarks) == 0) {
-        return("No benchmark information available.")
+        return("")
       }
       
-      benchmark_text <- "Benchmark Products by Factor:\n\n"
+      benchmark_text <- ""
       factors_with_benchmarks <- 0
       
       for (factor in names(result$benchmarks)) {
@@ -488,11 +459,11 @@ positionKFEServer <- function(id, app_data_connection = NULL, config = NULL,
           if (length(valid_products) > 0) {
             clean_factor <- stringr::str_replace_all(factor, "_", " ") %>% 
                            stringr::str_to_title()
+            # Show all products without limitation
             benchmark_text <- paste0(
               benchmark_text,
               clean_factor, ": ", 
-              paste(head(valid_products, 5), collapse = ", "),
-              if (length(valid_products) > 5) paste0(" (and ", length(valid_products) - 5, " more)") else "",
+              paste(valid_products, collapse = ", "),
               "\n"
             )
             factors_with_benchmarks <- factors_with_benchmarks + 1
@@ -501,7 +472,7 @@ positionKFEServer <- function(id, app_data_connection = NULL, config = NULL,
       }
       
       if (factors_with_benchmarks == 0) {
-        return("No valid benchmark products found. This may indicate data quality issues or that no products meet the benchmark criteria.")
+        return("")
       }
       
       return(benchmark_text)
@@ -509,19 +480,30 @@ positionKFEServer <- function(id, app_data_connection = NULL, config = NULL,
     
     # Display component status
     output$component_status <- renderText({
-      if (product_line_id() == "all") {
-        return("Please select a specific product line for key factor analysis")
+      # MP031: Defensive programming - check for NULL/empty values before switch
+      # R113: Error handling for reactive expressions
+      status_val <- tryCatch({
+        component_status()
+      }, error = function(e) {
+        warning("Error getting component status: ", e$message)
+        "idle"
+      })
+
+      # MP099: Defensive check for NULL or empty status
+      if (is.null(status_val) || length(status_val) == 0 || status_val == "") {
+        return("Ready for position analysis")
       }
-      
-      switch(component_status(),
-             idle = "Ready for key factor evaluation",
+
+      # Ensure status_val is character and length 1 for switch
+      status_val <- as.character(status_val)[1]
+
+      switch(status_val,
+             idle = "Ready for position analysis",
              loading = "Loading position data...",
-             ready = paste0("Analysis complete with ", 
-                          length(kfe_result()$key_factors %||% character(0)), 
-                          " key factors identified"),
-             computing = "Computing key factor analysis...",
-             error = "Error in key factor evaluation",
-             component_status())
+             ready = paste0("Position data loaded: ", nrow(position_data()), " records"),
+             computing = "Computing position metrics...",
+             error = "Error loading position data",
+             status_val)  # Default: return the status value itself
     })
     
     # Return reactive values for external use

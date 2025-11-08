@@ -1,0 +1,8 @@
+=== TESTING POSITION TABLE FIX ===
+Testing that item_id is properly renamed to product_id
+
+📦 Initializing environment...
+❌ Error initializing environment:  OPERATION_MODE is not defined. Please set OPERATION_MODE before sourcing this script. 
+Error in value[[3L]](cond) : Cannot proceed without initialization
+Calls: tryCatch -> tryCatchList -> tryCatchOne -> <Anonymous>
+Execution halted

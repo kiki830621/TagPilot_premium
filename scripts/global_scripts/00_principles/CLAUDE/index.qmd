@@ -1,0 +1,134 @@
+---
+title: "AI Assistant Guidelines Hub"
+subtitle: "Central documentation for Claude and other AI assistants working with this codebase"
+date-created: "2025-08-23"
+date-modified: "2025-08-23"
+author: "Claude"
+type: "guide"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-tools: true
+    number-sections: true
+---
+
+# AI Assistant Guidelines Hub {#overview}
+
+This directory contains all essential documentation and guidelines for AI assistants (especially Claude) working with the MAMBA/WISER codebase.
+
+## Core Documents {#core-docs}
+
+### 1. [CLAUDE.md](./CLAUDE.md)
+**Primary QMD Conversion Guidelines**
+- Language directory structure (en/ and zh/)
+- File naming conventions for principles and rules
+- Chapter classification decision tree
+- QMD file structure templates
+- Common mistakes to avoid
+
+### 2. [CLAUDE_REFERENCE.qmd](./CLAUDE_REFERENCE.qmd)
+**Quick Development Reference**
+- Critical pre-task checklist
+- Working directory setup requirements
+- Environment differences (RStudio vs Command Line)
+- Common error patterns and solutions
+- Performance optimization tips
+
+### 3. [CLAUDE_CHANGE_LOG.qmd](./CLAUDE_CHANGE_LOG.qmd)
+**Version History and Updates**
+- Documented changes to AI guidelines
+- Evolution of best practices
+- Lessons learned from past issues
+- New pattern discoveries
+
+### 4. [CLASSIFICATION_GUIDE.md](./CLASSIFICATION_GUIDE.md)
+**Principle Classification Decision Tree**
+- Visual and text-based decision process
+- Chapter assignment logic
+- Edge cases and multiple categories
+- Cross-reference guidelines
+
+## Key Guidelines Summary {#summary}
+
+### Working Directory Requirements
+```bash
+# ALWAYS start from project root
+cd /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA
+```
+
+### Principle Organization Structure
+```
+principles_qmd/
+├── natural/
+│   ├── CLAUDE/           # AI guidelines (this directory)
+│   ├── en/              # English documentation
+│   │   ├── part1_principles/
+│   │   ├── part2_implementations/
+│   │   └── part3_domain_knowledge/
+│   └── zh/              # Chinese documentation (same structure)
+```
+
+### File Naming Conventions
+- **Principles**: `{CATEGORY}_P{NUMBER}_{description}.qmd`
+- **Rules**: `{CATEGORY}_R{NUMBER}_{description}.qmd`
+- **Modules**: `M{NUMBER}_{description}.qmd`
+- **Derivations**: `D{NUMBER}_{description}.qmd`
+- **Solutions**: `SLN{NUMBER}_{description}.qmd`
+
+### Category Abbreviations
+- **SO**: Structure & Organization
+- **DM**: Data Management
+- **DEV**: Development Methodology
+- **UI**: UI Components
+- **TD**: Testing & Deployment
+- **IC**: Integration & Collaboration
+- **TS**: Terminology Standards
+
+## Usage Instructions {#usage}
+
+### For New AI Assistants
+1. **Start here**: Read [CLAUDE.md](./CLAUDE.md) for overall guidelines
+2. **Quick reference**: Keep [CLAUDE_REFERENCE.qmd](./CLAUDE_REFERENCE.qmd) open while working
+3. **Classification**: Use [CLASSIFICATION_GUIDE.md](./CLASSIFICATION_GUIDE.md) when organizing principles
+4. **Track changes**: Update [CLAUDE_CHANGE_LOG.qmd](./CLAUDE_CHANGE_LOG.qmd) when discovering new patterns
+
+### For Principle Organization
+1. Identify the principle type (MP, P, R, etc.)
+2. Use the classification decision tree to determine chapter
+3. Follow naming conventions strictly
+4. Create both English and Chinese versions when applicable
+5. Update relevant index files
+
+### For Code Development
+1. Always check working directory first
+2. Ensure autoinit() function is available
+3. Follow environment-specific guidelines
+4. Document any new patterns discovered
+
+## Common Pitfalls to Avoid {#pitfalls}
+
+1. **Wrong Directory**: Not starting from project root
+2. **Language Confusion**: Creating zh_TW or zh_CN instead of just zh/
+3. **Naming Errors**: Not following the strict naming conventions
+4. **Missing Cross-References**: Forgetting to link related principles
+5. **Incomplete Documentation**: Not updating both language versions
+
+## Maintenance {#maintenance}
+
+### Updating Guidelines
+When you discover new patterns or issues:
+1. Document in appropriate file
+2. Update this index if adding new files
+3. Add entry to CLAUDE_CHANGE_LOG.qmd
+4. Consider if classification tree needs updates
+
+### Review Schedule
+- Weekly: Check for new patterns from recent work
+- Monthly: Review and consolidate guidelines
+- Quarterly: Major revision of classification system if needed
+
+---
+
+*This hub serves as the central reference point for all AI assistants working with the MAMBA/WISER principles system. Keep it updated and organized.*

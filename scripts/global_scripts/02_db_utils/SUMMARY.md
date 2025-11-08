@@ -1,6 +1,40 @@
-# Universal Data Accessor Enhancement Summary
+# Database Utilities Module Summary
 
-## What We've Accomplished
+## Module Cleanup (2025-08-28)
+
+### What We've Accomplished
+1. **Analyzed function usage patterns** across the entire codebase
+2. **Removed 6 deprecated/unused functions** (3000+ lines of redundant code)
+3. **Moved 4 DuckDB-specific functions** to dedicated subdirectory
+4. **Streamlined module** from 19 to 9 core functions
+5. **Updated documentation** to reflect clean structure
+
+### Functions Kept (Essential Utilities)
+- `fn_dbConnectDuckdb.R` - Primary connection function used by all update scripts
+- `fn_dbDisconnect_all.R` - Clean disconnect for autodeinit
+- `fn_data_cleaning.R` - Data cleaning utilities
+- `fn_list_column_handling.R` - List column processing
+- `fn_coalesce_suffix_cols.R` - Column coalescing after joins
+- `fn_dbPrintInfo.R` - Database debugging
+- `fn_print_query.R` - SQL query debugging
+- `fn_get_default_db_paths.R` - Path management
+- `fn_set_db_paths.R` - Path configuration
+
+### Functions Moved to duckdb/
+- `fn_dbAttachDuckdb.R` - DuckDB attach operations
+- `fn_dbDetachDuckdb.R` - DuckDB detach operations
+- `fn_dbDetach_all.R` - Detach all databases
+- `fn_export_duckdb_dataframes.R` - Export utilities
+
+### Functions Archived (in archive_20250828/)
+- `fn_dbConnect_from_list.R` - Deprecated, overly complex
+- `fn_dbCopyTable.R` - Unused
+- `fn_dbCopyorReadTemp.R` - Unused
+- `fn_dbDeletedb.R` - Dangerous, unused
+- `fn_dbOverwrite.R` - Unused
+- `fn_nrow2.R` - Duplicate (use 04_utils/base/fn_nrow2.R)
+
+## Previous Enhancements
 
 1. **Integrated S4 Class Support:**
    - Combined main implementation with patch file for unified code

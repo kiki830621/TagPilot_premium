@@ -71,7 +71,7 @@ ui <- bs4Dash::dashboardPage(
   sidebar = bs4Dash::dashboardSidebar(
     bs4Dash::sidebarMenu(
       id = "sidebar",
-      bs4Dash::menuproduct(
+      bs4Dash::menuItem(
         text = "客戶資料",
         tabName = "customer",
         icon = icon("user")
@@ -84,8 +84,8 @@ ui <- bs4Dash::dashboardPage(
     )
   ),
   body = bs4Dash::dashboardBody(
-    bs4Dash::tabproducts(
-      bs4Dash::tabproduct(
+    bs4Dash::tabItems(
+      bs4Dash::tabItem(
         tabName = "customer",
         microCustomerUI("micro_customer")
       )

@@ -28,7 +28,7 @@ tryCatch({
   cat("✅ 找到專案根目錄：", project_root, "\n")
   
   # 額外驗證：確保找到的是真正的專案根目錄
-  expected_dirs <- c("l1_basic", "l2_pro", "l3_enterprise", "global_scripts")
+  expected_dirs <- c("l1_basic", "l2_pro", "l4_enterprise", "global_scripts")
   found_dirs <- sum(sapply(expected_dirs, function(d) dir.exists(file.path(project_root, d))))
   
   if (found_dirs < 2) {
@@ -62,7 +62,7 @@ if (!dir.exists(file.path(project_root, "l1_basic"))) {
 
 # 顯示找到的目錄結構
 cat("\n專案結構驗證：\n")
-dirs_to_check <- c("l1_basic", "l2_pro", "l3_enterprise", "global_scripts", "docs")
+dirs_to_check <- c("l1_basic", "l2_pro", "l4_enterprise", "global_scripts", "docs")
 for (dir in dirs_to_check) {
   if (dir.exists(file.path(project_root, dir))) {
     cat("  ✅", dir, "\n")

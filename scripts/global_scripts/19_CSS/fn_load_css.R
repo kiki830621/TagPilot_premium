@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #LOCK FILE
 
 #' Load CSS files from the CSS directory

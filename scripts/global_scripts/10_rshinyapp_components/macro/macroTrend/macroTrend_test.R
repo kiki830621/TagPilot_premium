@@ -131,15 +131,15 @@ test_app <- function() {
     sidebar = bs4Dash::dashboardSidebar(
       bs4Dash::sidebarMenu(
         id = "menu",
-        bs4Dash::menuproduct(
+        bs4Dash::menuItem(
           text = "Test macroTrend",
           tabName = "test"
         )
       )
     ),
     body = bs4Dash::dashboardBody(
-      bs4Dash::tabproducts(
-        bs4Dash::tabproduct(
+      bs4Dash::tabItems(
+        bs4Dash::tabItem(
           tabName = "test",
           fluidRow(
             column(

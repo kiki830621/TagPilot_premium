@@ -813,7 +813,7 @@ create_universal_test_app <- function() {
     
     # Update validation panel class based on user validation
     observe({
-      # If all products are checked and the pass button is clicked, show success
+      # If all items are checked and the pass button is clicked, show success
       if (input$validation_pass > 0) {
         shinyjs::addClass(selector = "#user_validation_panel", class = "validation-success")
         shinyjs::removeClass(selector = "#user_validation_panel", class = "validation-pending")

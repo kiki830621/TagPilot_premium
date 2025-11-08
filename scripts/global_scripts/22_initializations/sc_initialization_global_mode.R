@@ -46,9 +46,8 @@ initialize_packages(
 )
 
 #------------------------------
-# 直接載入根路徑配置
-SKIP_WRITE_ROOT_PATH <- TRUE
-source_with_verbose(file.path("scripts", "global_scripts", "00_principles", "fn_root_path_config.R"))
+# 根路徑配置已移除（使用 autoinit() 處理）
+# 原本的 fn_root_path_config.R 是殭屍程式碼，已刪除
 
 # bslib functions
 page_navbar <- bslib::page_navbar

@@ -1,6 +1,7 @@
 #LOCK FILE
 #
 # poissonFeatureAnalysis.R
+# Poisson 特徵分析組件（InsightForge 風格）
 #
 # Following principles:
 # - MP56: Connected Component Principle (component structure)
@@ -11,847 +12,901 @@
 # - MP88: Immediate Feedback (real-time filtering without Apply button)
 #
 # Features:
-#   • All product attributes Poisson regression analysis
-#   • Price effects, brand effects, category effects
-#   • Feature importance ranking and comparison
-#   • Comprehensive attribute impact visualization
-#   • Cross product line attribute comparison
+#   • InsightForge 賽道倍數和邊際效應分析
+#   • 戰略重點（賽道倍數）vs 日常優化（邊際效應）
+#   • 清晰的商業意義解讀
+#   • 互動式視覺化呈現
 # -----------------------------------------------------------------------------
 
 # helper ----------------------------------------------------------------------
-#' Paste operator for string concatenation
-#' @param x Character string. First string to concatenate.
-#' @param y Character string. Second string to concatenate.
-#' @return Character string. The concatenated result of x and y.
 `%+%` <- function(x, y) paste0(x, y)
-
-#' NULL coalescing operator
-#' @param x Any value. The value to use if not NULL.
-#' @param y Any value. The fallback value to use if x is NULL.
-#' @return Either x or y. Returns x if it's not NULL, otherwise returns y.
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-# Filter UI -------------------------------------------------------------------
-#' poissonFeatureAnalysisFilterUI
-#' @param id Character string. The module ID used for namespacing inputs and outputs.
-#' @param translate Function. Translation function for UI text elements (defaults to identity function).
-#'        Should accept a string and return a translated string.
-#' @return shiny.tag. A Shiny UI component containing the filter controls for the feature analysis component.
+# Helper function to calculate attribute range dynamically
+# Following MP047: Functional Programming - create reusable function
+# Following MP081: Explicit Parameter Specification
+calculate_attribute_range <- function(predictor_name, data_connection = NULL) {
+  # Default range if we can't determine actual range
+  default_range <- 4
+  
+  # Try to infer range from predictor name patterns
+  # Following R116: Enhanced Data Access
+  if (grepl("rating|score|star", predictor_name, ignore.case = TRUE)) {
+    # Rating/score variables typically range 1-5
+    return(4)  # 5 - 1 = 4
+  } else if (grepl("binary|flag|is_|has_", predictor_name, ignore.case = TRUE)) {
+    # Binary variables range 0-1
+    return(1)  # 1 - 0 = 1
+  } else if (grepl("percentage|percent|rate", predictor_name, ignore.case = TRUE)) {
+    # Percentage variables typically 0-100
+    return(100)
+  } else if (grepl("count|quantity|number", predictor_name, ignore.case = TRUE)) {
+    # Count variables - use conservative estimate
+    return(10)  # Conservative estimate for counts
+  } else if (grepl("price|cost|revenue", predictor_name, ignore.case = TRUE)) {
+    # Price variables - use moderate range
+    return(50)  # Moderate price range estimate
+  }
+  
+  # If we have data connection, try to get actual range
+  # (Future enhancement: query actual data ranges from database)
+  
+  # Default fallback
+  return(default_range)
+}
+
+# Helper function to calculate track multiplier with dynamic range
+# Following MP088: Immediate Feedback - provide clear calculation basis
+calculate_track_multiplier <- function(coefficient, predictor_name, incidence_rate_ratio = NULL) {
+  # Get the attribute range dynamically
+  attr_range <- calculate_attribute_range(predictor_name)
+  
+  # Method 1: Using coefficient (preferred when available)
+  if (!is.na(coefficient)) {
+    # For extreme coefficients, use capped calculation to avoid overflow
+    if (abs(coefficient) > 2) {
+      # Linear scaling for large coefficients to avoid exponential explosion
+      track_multiplier <- exp(2) * (1 + (abs(coefficient) - 2) * 0.5)
+    } else {
+      # Standard calculation: exp(range × |coefficient|)
+      # But cap the range effect to avoid unrealistic values
+      effective_range <- min(attr_range, 10)  # Cap range effect at 10
+      track_multiplier <- exp(abs(coefficient) * sqrt(effective_range))  # Use sqrt to moderate the effect
+    }
+  }
+  # Method 2: Using incidence rate ratio (fallback)
+  else if (!is.null(incidence_rate_ratio) && !is.na(incidence_rate_ratio)) {
+    # Calculate power based on actual range
+    # Use sqrt of range to moderate the exponential effect
+    power <- sqrt(attr_range)
+    track_multiplier <- incidence_rate_ratio ^ power
+  }
+  else {
+    return(NA)
+  }
+  
+  # Cap at reasonable maximum (100x)
+  return(round(min(track_multiplier, 100), 1))
+}
+
+# Filter UI (InsightForge Style) ----------------------------------------------
 poissonFeatureAnalysisFilterUI <- function(id, translate = identity) {
   ns <- NS(id)
   
   wellPanel(
     style = "padding:15px;",
-    h4(translate("精準模型篩選")),
+    h4(translate("精準行銷分析")),
+    p(translate("使用 InsightForge 360 技術分析產品屬性影響力")),
     
-    # Feature type filter
-    checkboxGroupInput(
-      inputId = ns("feature_types"),
-      label = translate("特徵類型"),
-      choices = list(
-        "價格特徵" = "price",
-        "品牌特徵" = "brand", 
-        "數值特徵" = "numeric",
-        "類別特徵" = "factor",
-        "定位特徵" = "positioning"
-      ),
-      selected = c("price", "brand", "numeric", "factor", "positioning")
-    ),
-    
-    # Significance filter
-    checkboxInput(
-      inputId = ns("show_significant_only"),
-      label = translate("只顯示顯著結果 (p<0.05)"),
-      value = FALSE
-    ),
-    
-    # Top N filter
-    numericInput(
-      inputId = ns("top_n_features"),
-      label = translate("顯示前N個重要特徵"),
-      value = 20,
-      min = 5,
-      max = 100,
-      step = 5
-    ),
-    
-    # Display options
     hr(),
-    h4(translate("顯示選項")),
     
-    # Sort by
-    selectInput(
-      inputId = ns("sort_by"),
-      label = translate("排序依據"),
-      choices = list(
-        "P值 (顯著性)" = "p_value",
-        "發生率比大小" = "irr_magnitude",
-        "係數絕對值" = "coefficient_abs",
-        "AIC值" = "aic"
-      ),
-      selected = "p_value"
-    ),
-    
-    # Chart orientation
-    radioButtons(
-      inputId = ns("chart_orientation"),
-      label = translate("圖表方向"),
-      choices = list(
-        "水平" = "horizontal",
-        "垂直" = "vertical"
-      ),
-      selected = "horizontal"
-    ),
-    
-    # Reset button
+    # AI Analysis buttons
     actionButton(
-      inputId = ns("reset_filters"),
-      label = translate("重置篩選"),
-      class = "btn-outline-secondary btn-block mt-3"
+      inputId = ns("generate_precision_insight"),
+      label = translate("生成 AI 精準行銷洞察"),
+      class = "btn-primary btn-block",
+      icon = icon("magic")
     ),
     
-    hr(),
-    textOutput(ns("component_status"))
+    br(), br(),
+    
+    actionButton(
+      inputId = ns("generate_product_development"),
+      label = translate("生成 AI 新產品開發建議"),
+      class = "btn-success btn-block",
+      icon = icon("lightbulb")
+    )
   )
 }
 
-# Display UI ------------------------------------------------------------------
-#' poissonFeatureAnalysisDisplayUI
-#' @param id Character string. The module ID used for namespacing inputs and outputs.
-#' @param translate Function. Translation function for UI text elements (defaults to identity function).
-#' @return shiny.tag. A Shiny UI component containing the display elements for the feature analysis.
-poissonFeatureAnalysisDisplayUI <- function(id, translate = identity) {
+# Display UI (InsightForge Style) ---------------------------------------------
+poissonFeatureAnalysisUI <- function(id, translate = identity) {
   ns <- NS(id)
   
   tagList(
+    # Include shinyjs dependency
+    shinyjs::useShinyjs(),
     div(class = "component-header mb-3 text-center",
-        h3(translate("精準模型分析")),
-        p(translate("全面分析商品屬性對銷售的影響：價格、品牌、類別、定位等因素效應"))),
+        h3(translate("🎯 產品屬性影響力分析")),
+        p(translate("運用賽道倍數與邊際效應，精準識別戰略重點與日常優化方向"))),
     
-    # Summary cards row
+    # InsightForge 風格的摘要卡片
     fluidRow(
       column(3,
-        div(class = "info-box bg-primary",
+        div(class = "info-box bg-danger",
             div(class = "info-box-content",
-                h4(textOutput(ns("total_features")), class = "text-white"),
-                p(translate("總特徵數"), class = "text-white")))),
+                h4(textOutput(ns("track_champion")), class = "text-white"),
+                p(translate("🏁 賽道冠軍"), class = "text-white")))),
       column(3,
-        div(class = "info-box bg-success", 
+        div(class = "info-box bg-danger", 
             div(class = "info-box-content",
-                h4(textOutput(ns("significant_features")), class = "text-white"),
-                p(translate("顯著特徵"), class = "text-white")))),
+                h4(textOutput(ns("track_multiplier_value")), class = "text-white"),
+                p(translate("最大賽道倍數"), class = "text-white")))),
       column(3,
         div(class = "info-box bg-warning",
             div(class = "info-box-content",
-                h4(textOutput(ns("top_feature")), class = "text-white"),
-                p(translate("最重要特徵"), class = "text-white")))),
+                h4(textOutput(ns("marginal_champion")), class = "text-white"),
+                p(translate("⚡ 邊際冠軍"), class = "text-white")))),
       column(3,
-        div(class = "info-box bg-info",
+        div(class = "info-box bg-warning",
             div(class = "info-box-content",
-                h4(textOutput(ns("feature_types_count")), class = "text-white"),
-                p(translate("特徵類型數"), class = "text-white"))))
+                h4(textOutput(ns("marginal_effect_value")), class = "text-white"),
+                p(translate("最大邊際效應"), class = "text-white"))))
     ),
     
-    # Main visualization
+    # 決策指南
+    div(class = "alert alert-info mb-3",
+        h5("📊 決策指南"),
+        tags$ul(
+          tags$li("賽道倍數 > 2.0：極重要因素，是核心競爭力"),
+          tags$li("賽道倍數 1.2-2.0：重要影響因素，應重點關注"),
+          tags$li("邊際效應 > 50%：強烈影響，小改進大效果"),
+          tags$li("邊際效應 20-50%：中等影響，穩定改進策略")
+        )
+    ),
+    
+    # 主要視覺化區域
     div(class = "component-output p-3",
-        tabsetPanel(
-          id = ns("analysis_tabs"),
-          
-          # Feature importance overview
-          tabPanel(
-            title = translate("特徵重要性"),
-            value = "importance",
-            br(),
-            plotly::plotlyOutput(ns("feature_importance_plot"), height = "600px")
+        fluidRow(
+          column(12,
+            div(class = "card",
+                div(class = "card-header",
+                    h4("🏁 屬性賽道倍數分析")),
+                div(class = "card-body",
+                    plotly::plotlyOutput(ns("track_multiplier_plot"), height = "500px")))
+          )
+        ),
+        br(),
+        fluidRow(
+          column(6,
+            div(class = "card",
+                div(class = "card-header",
+                    h4("⚡ 邊際效應排行")),
+                div(class = "card-body",
+                    plotly::plotlyOutput(ns("marginal_effect_plot"), height = "400px")))
           ),
-          
-          # Price analysis
-          tabPanel(
-            title = translate("價格效應分析"),
-            value = "price", 
-            br(),
-            fluidRow(
-              column(6, plotly::plotlyOutput(ns("price_effects_plot"), height = "400px")),
-              column(6, plotly::plotlyOutput(ns("price_comparison_plot"), height = "400px"))
-            )
-          ),
-          
-          # Brand and category analysis
-          tabPanel(
-            title = translate("品牌類別分析"),
-            value = "brand_category",
-            br(),
-            fluidRow(
-              column(12, plotly::plotlyOutput(ns("brand_category_plot"), height = "500px"))
-            )
-          ),
-          
-          # Product line comparison
-          tabPanel(
-            title = translate("產品線比較"),
-            value = "comparison",
-            br(),
-            plotly::plotlyOutput(ns("product_line_comparison_plot"), height = "600px")
-          ),
-          
-          # Detailed table
-          tabPanel(
-            title = translate("詳細數據"),
-            value = "table",
-            br(),
-            DTOutput(ns("feature_analysis_table"), width = "100%")
-          ),
-          
-          # Model quality
-          tabPanel(
-            title = translate("模型品質"),
-            value = "quality",
-            br(),
-            fluidRow(
-              column(6, plotly::plotlyOutput(ns("r_squared_plot"), height = "400px")),
-              column(6, plotly::plotlyOutput(ns("model_performance_plot"), height = "400px"))
+          column(6,
+            div(class = "card",
+                div(class = "card-header",
+                    h4("💡 策略建議")),
+                div(class = "card-body",
+                    htmlOutput(ns("strategy_recommendation"))))
+          )
+        ),
+        br(),
+        fluidRow(
+          column(12,
+            div(class = "card",
+                div(class = "card-header bg-light",
+                    h4("📋 詳細分析結果", style = "margin: 0; padding: 10px 0;")),
+                div(class = "card-body", style = "padding-top: 20px;",
+                    DT::DTOutput(ns("analysis_table"), width = "100%")))
+          )
+        ),
+        br(),
+        # AI Insights Section
+        fluidRow(
+          column(12,
+            div(class = "card",
+                id = ns("ai_insights_section"),
+                style = "display: none;",  # Initially hidden
+                div(class = "card-header bg-primary text-white",
+                    h4("🤖 InsightForge 360 - 精準行銷洞察報告", style = "margin: 0; padding: 10px 0;")),
+                div(class = "card-body", style = "padding: 30px;",
+                    if (requireNamespace("shinycssloaders", quietly = TRUE)) {
+                      shinycssloaders::withSpinner(
+                        htmlOutput(ns("precision_insight_output")),
+                        type = 6,
+                        color = "#0d6efd"
+                      )
+                    } else {
+                      htmlOutput(ns("precision_insight_output"))
+                    }
+                )
             )
           )
-        ))
+        ),
+        br(),
+        # AI New Product Development Section
+        fluidRow(
+          column(12,
+            div(class = "card",
+                id = ns("ai_product_development_section"),
+                style = "display: none;",  # Initially hidden
+                div(class = "card-header bg-success text-white",
+                    h4("🚀 AI 新產品開發建議", style = "margin: 0; padding: 10px 0;")),
+                div(class = "card-body", style = "padding: 30px;",
+                    if (requireNamespace("shinycssloaders", quietly = TRUE)) {
+                      shinycssloaders::withSpinner(
+                        htmlOutput(ns("product_development_output")),
+                        type = 6,
+                        color = "#28a745"
+                      )
+                    } else {
+                      htmlOutput(ns("product_development_output"))
+                    }
+                )
+            )
+          )
+        )
+    )
   )
 }
 
-# Server ----------------------------------------------------------------------
-#' poissonFeatureAnalysisServer
-#' @param id Character string. The module ID used for namespacing inputs and outputs.
-#' @param app_data_connection Database connection object or list. Any connection type supported by tbl2.
-#'        Can be a DBI connection, a list with getter functions, a file path, or NULL if no database access is needed.
-#' @param config List or reactive expression. Optional configuration settings that can customize behavior.
-#'        If reactive, will be re-evaluated when dependencies change.
-#' @param session Shiny session object. The current Shiny session (defaults to getDefaultReactiveDomain()).
-#' @return list. A list of reactive values providing access to component state and data.
+# Server (InsightForge Style) -------------------------------------------------
 poissonFeatureAnalysisServer <- function(id, app_data_connection = NULL, config = NULL,
-                                        session = getDefaultReactiveDomain()) {
+                                                    session = getDefaultReactiveDomain()) {
   moduleServer(id, function(input, output, session) {
     
-    # ------------ Status tracking ----------------------------------
+    # 狀態追蹤
     component_status <- reactiveVal("idle")
     
-    # ------------ Extract configuration parameters -----------------
+    # 提取配置參數
     platform_id <- reactive({
-      tryCatch({
-        if (is.null(config)) return("cbz")
-        
-        if (is.function(config)) {
-          if (shiny::is.reactive(config) || "reactive" %in% class(config)) {
-            cfg <- config()
-          } else {
-            cfg <- config
-          }
-        } else {
-          cfg <- config
-        }
-        
-        if (!is.null(cfg)) {
-          if (!is.null(cfg[["filters"]]) && !is.null(cfg[["filters"]][["platform_id"]])) {
-            return(as.character(cfg[["filters"]][["platform_id"]]))
-          }
-          if (!is.null(cfg[["platform_id"]])) {
-            return(as.character(cfg[["platform_id"]]))
-          }
-        }
-        
-        "cbz"  # Default platform
-      }, error = function(e) {
-        warning("Error extracting platform_id: ", e$message)
-        "cbz"
-      })
+      if (is.null(config)) return("cbz")
+      
+      if (is.function(config)) {
+        cfg <- if (shiny::is.reactive(config)) config() else config
+      } else {
+        cfg <- config
+      }
+      
+      cfg$filters$platform_id %||% cfg$platform_id %||% "cbz"
     })
     
+    # 提取產品線參數
     product_line_id <- reactive({
-      tryCatch({
-        if (is.null(config)) return("all")
-        
-        if (is.function(config)) {
-          if (shiny::is.reactive(config) || "reactive" %in% class(config)) {
-            cfg <- config()
-          } else {
-            cfg <- config
-          }
-        } else {
-          cfg <- config
-        }
-        
-        if (!is.null(cfg)) {
-          if (!is.null(cfg[["filters"]]) && !is.null(cfg[["filters"]][["product_line_id"]])) {
-            return(as.character(cfg[["filters"]][["product_line_id"]]))
-          }
-          if (!is.null(cfg[["product_line_id"]])) {
-            return(as.character(cfg[["product_line_id"]]))
-          }
-        }
-        
-        "all"  # Default product line
-      }, error = function(e) {
-        warning("Error extracting product_line_id: ", e$message)
-        "all"
-      })
+      if (is.null(config)) return("all")
+      
+      if (is.function(config)) {
+        cfg <- if (shiny::is.reactive(config)) config() else config
+      } else {
+        cfg <- config
+      }
+      
+      cfg$filters$product_line_id %||% cfg$product_line_id %||% "all"
     })
     
-    # ------------ Data access (R116) -----------------------------------
-    poisson_data <- reactive({
+    # 載入並處理數據
+    analysis_data <- reactive({
       component_status("loading")
       
-      result <- tryCatch({
+      tryCatch({
         if (is.null(app_data_connection)) {
-          warning("No valid database connection available")
+          component_status("error")
           return(data.frame())
         }
         
-        platform <- platform_id()
-        table_name <- paste0("df_", platform, "_poisson_analysis_all")
-        tbl <- tbl2(app_data_connection, table_name)
+        # 載入 Poisson 分析結果
+        # 暫時統一使用 Cyberbiz 的數據
+        # platform <- platform_id()
+        platform <- "cbz"  # 固定使用 Cyberbiz
+        prod_line <- product_line_id()
         
-        # Filter for non-time features (all attributes except comment/rating which have their own component)
-        feature_data <- tbl %>% 
-          dplyr::filter(predictor_type != "time_feature" & predictor_type != "comment_rating") %>%
-          collect()
+        # 根據產品線選擇適當的表格
+        if (prod_line == "all") {
+          table_name <- paste0("df_", platform, "_poisson_analysis_all")
+        } else {
+          table_name <- paste0("df_", platform, "_poisson_analysis_", prod_line)
+        }
+        
+        # 使用 global_scripts 中的函數（如果存在）
+        if (exists("poisson_regression")) {
+          # 如果已載入 InsightForge 函數，直接使用
+          data <- tbl2(app_data_connection, table_name) %>%
+            filter(predictor_type != "time_feature" &
+                   convergence == "converged") %>%
+            collect()
+          
+          # 計算 InsightForge 指標
+          # Following MP047: Functional Programming - use helper functions
+          # Following MP088: Immediate Feedback - show calculation basis
+          data <- data %>%
+            mutate(
+              # 限制邊際效應在合理範圍內
+              marginal_effect_pct = round(ifelse(abs(coefficient) > 5,
+                                                sign(coefficient) * 500,  # 最大 ±500%
+                                                (exp(coefficient) - 1) * 100), 1),
+              # Dynamic track multiplier calculation based on actual attribute range
+              track_multiplier = mapply(calculate_track_multiplier, 
+                                       coefficient, 
+                                       predictor,
+                                       MoreArgs = list(incidence_rate_ratio = NULL)),
+              practical_meaning = case_when(
+                track_multiplier >= 3.0 ~ "極重要因素，核心競爭力",
+                track_multiplier >= 2.0 ~ "重要影響因素，應重點關注", 
+                track_multiplier >= 1.2 ~ "有一定影響，可考慮優化",
+                TRUE ~ "影響很小，不是關鍵因素"
+              ),
+              track_explanation = paste0(
+                "從最", ifelse(coefficient > 0, "低", "高"), "到最",
+                ifelse(coefficient > 0, "高", "低"), "，銷量可相差",
+                track_multiplier, "倍",
+                " (基於屬性範圍: ", sapply(predictor, calculate_attribute_range), ")"
+              )
+            )
+        } else {
+          # 如果沒有載入函數，使用基本計算
+          # 需要重新建立 table_name（因為在 if 區塊內）
+          if (prod_line == "all") {
+            table_name <- paste0("df_", platform, "_poisson_analysis_all")
+          } else {
+            table_name <- paste0("df_", platform, "_poisson_analysis_", prod_line)
+          }
+          
+          data <- tbl2(app_data_connection, table_name) %>%
+            filter(predictor_type != "time_feature" &
+                   convergence == "converged") %>%
+            collect() %>%
+            mutate(
+              # 限制邊際效應在合理範圍內
+              marginal_effect_pct = round(pmin(pmax((incidence_rate_ratio - 1) * 100, -90), 500), 1),
+              # Dynamic track multiplier calculation using actual attribute ranges
+              # Following R116: Enhanced Data Access - use appropriate calculations
+              track_multiplier = mapply(calculate_track_multiplier,
+                                      coefficient = NA,
+                                      predictor,
+                                      incidence_rate_ratio),
+              practical_meaning = case_when(
+                track_multiplier >= 3.0 ~ "極重要因素，核心競爭力",
+                track_multiplier >= 2.0 ~ "重要影響因素，應重點關注",
+                track_multiplier >= 1.2 ~ "有一定影響，可考慮優化",
+                TRUE ~ "影響很小，不是關鍵因素"
+              ),
+              track_explanation = paste0("影響倍數：", track_multiplier, "倍",
+                                        " (屬性範圍: ", sapply(predictor, calculate_attribute_range), ")")
+            )
+        }
         
         component_status("ready")
-        return(feature_data)
+        return(data)
         
       }, error = function(e) {
-        warning("Error fetching Poisson data: ", e$message)
+        warning("Error loading analysis data: ", e$message)
         component_status("error")
         data.frame()
       })
-      
-      return(result)
     })
     
-    # ------------ Feature classification function ------------------
-    classify_feature_type <- function(predictor, predictor_type) {
-      case_when(
-        grepl("price|cost|amount", predictor, ignore.case = TRUE) ~ "price",
-        grepl("brand|manufacturer", predictor, ignore.case = TRUE) ~ "brand",
-        predictor_type == "comment_rating" ~ "positioning",  # comment_rating already classified should be positioning
-        grepl("position|factor|component", predictor, ignore.case = TRUE) ~ "positioning", 
-        predictor_type == "numeric" ~ "numeric",
-        predictor_type == "factor" ~ "factor",
-        TRUE ~ "other"
-      )
-    }
-    
-    # ------------ Filter Options -----------------------------------------
-    # No additional filter options needed - platform and product line come from config
-    
-    # ------------ Filtered Data ----------------------------------------
-    filtered_data <- reactive({
-      data <- poisson_data()
+    # 篩選顯示所有有效的屬性（不限於正向影響）
+    positive_data <- reactive({
+      data <- analysis_data()
       
-      if (is.null(data) || nrow(data) == 0) return(data.frame())
-      
-      # Add feature type classification
-      data <- data %>%
-        dplyr::mutate(feature_type = classify_feature_type(predictor, predictor_type))
-      
-      # Filter by product line from config
-      current_product_line <- product_line_id()
-      if (!is.null(current_product_line) && current_product_line != "all") {
-        data <- data %>% dplyr::filter(product_line_id == current_product_line)
+      # 顯示找到多少資料
+      if (nrow(data) > 0) {
+        cat("精準模型找到", nrow(data), "筆屬性資料\n")
       }
       
-      # Filter by feature types
-      if (length(input$feature_types) > 0) {
-        data <- data %>% dplyr::filter(feature_type %in% input$feature_types)
+      # 顯示所有有係數和p值的屬性，但排除評分相關屬性和異常值
+      filtered_data <- data %>%
+        filter(!is.na(coefficient) & !is.na(p_value) &
+               !grepl("rating", predictor, ignore.case = TRUE) &
+               abs(coefficient) <= 10)  # 排除係數過大的異常值（如 material）
+      
+      # Apply covariate exclusion rules for display purposes only
+      # This preserves the full analysis but filters what users see
+      if (nrow(filtered_data) > 0) {
+        tryCatch({
+          all_predictors <- unique(filtered_data$predictor)
+          kept_predictors <- filter_covariates(
+            var_names = all_predictors,
+            app_type = "poisson_regression",
+            verbose = FALSE
+          )
+          
+          # Filter data to keep only allowed predictors
+          filtered_data <- filtered_data %>%
+            dplyr::filter(predictor %in% kept_predictors)
+          
+          # Log exclusions if verbose
+          excluded_count <- length(all_predictors) - length(kept_predictors)
+          if (excluded_count > 0) {
+            message(sprintf("Hiding %d covariates from display based on exclusion rules", excluded_count))
+          }
+        }, error = function(e) {
+          # If function not available, show all predictors
+          warning("filter_covariates not available, showing all covariates: ", e$message)
+        })
       }
       
-      # Filter by significance
-      if (input$show_significant_only) {
-        data <- data %>% 
-          dplyr::filter(!is.na(p_value) & p_value < 0.05 & convergence == "converged")
-      }
-      
-      # Add sorting metrics
-      data <- data %>%
-        dplyr::mutate(
-          irr_magnitude = abs(log(ifelse(is.na(incidence_rate_ratio), 1, incidence_rate_ratio))),
-          coefficient_abs = abs(ifelse(is.na(coefficient), 0, coefficient))
-        )
-      
-      # Sort data
-      data <- switch(input$sort_by,
-        "p_value" = data %>% dplyr::arrange(p_value, desc(irr_magnitude)),
-        "irr_magnitude" = data %>% dplyr::arrange(desc(irr_magnitude)),
-        "coefficient_abs" = data %>% dplyr::arrange(desc(coefficient_abs)),
-        "aic" = data %>% dplyr::arrange(aic),
-        data
-      )
-      
-      # Limit to top N
-      if (!is.null(input$top_n_features) && input$top_n_features > 0) {
-        data <- data %>% dplyr::slice_head(n = input$top_n_features)
-      }
-      
-      return(data)
+      filtered_data %>%
+        arrange(desc(abs(track_multiplier)))  # 按絕對值排序
     })
     
-    # ------------ Summary Statistics --------------------------------
-    output$total_features <- renderText({
-      data <- filtered_data()
-      if (nrow(data) == 0) return("0")
-      formatC(nrow(data), format = "d", big.mark = ",")
-    })
-    
-    output$significant_features <- renderText({
-      data <- filtered_data()
-      if (nrow(data) == 0) return("0")
-      sig_count <- sum(!is.na(data$p_value) & data$p_value < 0.05 & data$convergence == "converged", na.rm = TRUE)
-      formatC(sig_count, format = "d", big.mark = ",")
-    })
-    
-    output$top_feature <- renderText({
-      data <- filtered_data()
+    # 摘要統計 - 顯示影響力最大的屬性（不論正負）
+    output$track_champion <- renderText({
+      data <- positive_data()
       if (nrow(data) == 0) return("--")
       
-      top_row <- data %>% 
-        dplyr::filter(!is.na(p_value) & convergence == "converged") %>%
-        dplyr::slice_head(n = 1)
-      
-      if (nrow(top_row) == 0) return("無資料")
-      
-      predictor_short <- if (nchar(top_row$predictor[1]) > 15) {
-        paste0(substr(top_row$predictor[1], 1, 12), "...")
+      # 選擇賽道倍數最大的（已按絕對值排序）
+      top <- data[1, ]
+      if (nchar(top$predictor) > 15) {
+        paste0(substr(top$predictor, 1, 12), "...")
       } else {
-        top_row$predictor[1]
+        top$predictor
       }
-      
-      predictor_short
     })
     
-    output$feature_types_count <- renderText({
-      data <- filtered_data()
-      if (nrow(data) == 0) return("0")
-      length(unique(data$feature_type))
+    output$track_multiplier_value <- renderText({
+      data <- positive_data()
+      if (nrow(data) == 0) return("--")
+      paste0(data$track_multiplier[1], " 倍")
     })
     
-    # ------------ Visualizations ------------------------------------
-    
-    # Feature importance plot
-    output$feature_importance_plot <- plotly::renderPlotly({
-      data <- filtered_data()
+    output$marginal_champion <- renderText({
+      data <- positive_data()
+      if (nrow(data) == 0) return("--")
       
-      if (nrow(data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No data available"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
-      }
-      
-      # Prepare data for plotting
-      plot_data <- data %>%
-        dplyr::filter(!is.na(incidence_rate_ratio) & convergence == "converged") %>%
-        dplyr::mutate(
-          is_significant = !is.na(p_value) & p_value < 0.05,
-          predictor_short = ifelse(nchar(predictor) > 25, 
-                                  paste0(substr(predictor, 1, 22), "..."), 
-                                  predictor),
-          # Order for plotting
-          predictor_ordered = factor(predictor_short, levels = rev(predictor_short))
-        )
-      
-      # Choose orientation
-      if (input$chart_orientation == "horizontal") {
-        p <- ggplot2::ggplot(plot_data, ggplot2::aes(y = predictor_ordered, x = incidence_rate_ratio,
-                                                    color = feature_type, shape = is_significant)) +
-          ggplot2::geom_point(size = 3, alpha = 0.7) +
-          ggplot2::geom_vline(xintercept = 1, linetype = "dashed", alpha = 0.5) +
-          ggplot2::labs(
-            title = "特徵重要性分析",
-            y = "特徵名稱",
-            x = "發生率比 (IRR)"
-          )
+      top <- data %>% arrange(desc(abs(marginal_effect_pct))) %>% slice(1)
+      if (nchar(top$predictor) > 15) {
+        paste0(substr(top$predictor, 1, 12), "...")
       } else {
-        p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = predictor_ordered, y = incidence_rate_ratio,
-                                                    color = feature_type, shape = is_significant)) +
-          ggplot2::geom_point(size = 3, alpha = 0.7) +
-          ggplot2::geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.5) +
-          ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
-          ggplot2::labs(
-            title = "特徵重要性分析",
-            x = "特徵名稱",
-            y = "發生率比 (IRR)"
+        top$predictor
+      }
+    })
+    
+    output$marginal_effect_value <- renderText({
+      data <- positive_data()
+      if (nrow(data) == 0) return("--")
+      
+      top <- data %>% arrange(desc(abs(marginal_effect_pct))) %>% slice(1)
+      paste0(abs(top$marginal_effect_pct), "%")
+    })
+    
+    # 賽道倍數圖
+    output$track_multiplier_plot <- plotly::renderPlotly({
+      # 顯示前20個最重要的屬性（按賽道倍數絕對值）
+      data <- positive_data() %>% 
+        filter(!is.na(track_multiplier)) %>%
+        slice_head(n = 20)
+      
+      if (nrow(data) == 0) {
+        plotly::plot_ly() %>%
+          plotly::add_text(x = 0.5, y = 0.5, text = "無正向影響的屬性資料",
+                          textposition = "center", showlegend = FALSE)
+      } else {
+        data <- data %>%
+          mutate(
+            hover_text = paste0(
+              "屬性: ", predictor, "<br>",
+              "賽道倍數: ", track_multiplier, " 倍<br>",
+              "邊際效應: ", marginal_effect_pct, "%<br>",
+              "商業意義: ", practical_meaning, "<br>",
+              track_explanation
+            ),
+            predictor_short = ifelse(nchar(predictor) > 20,
+                                   paste0(substr(predictor, 1, 17), "..."),
+                                   predictor)
+          )
+        
+        plotly::plot_ly(data, 
+                       x = ~track_multiplier,
+                       y = ~reorder(predictor_short, track_multiplier),
+                       type = "bar",
+                       orientation = "h",
+                       marker = list(color = ~track_multiplier,
+                                   colorscale = list(c(0, "#FFF3CD"), c(0.5, "#FFC107"), c(1, "#DC3545")),
+                                   cmin = 1, cmax = max(data$track_multiplier)),
+                       text = ~hover_text,
+                       textposition = "none",  # 不顯示文字標籤
+                       hoverinfo = "text") %>%
+          plotly::layout(
+            title = "",
+            xaxis = list(title = "賽道倍數（從最低到最高的影響倍數）"),
+            yaxis = list(title = ""),
+            shapes = list(
+              list(type = "line", x0 = 2, x1 = 2, y0 = -0.5, y1 = length(unique(data$predictor)) - 0.5,
+                   line = list(color = "red", dash = "dash")),
+              list(type = "line", x0 = 1.2, x1 = 1.2, y0 = -0.5, y1 = length(unique(data$predictor)) - 0.5,
+                   line = list(color = "orange", dash = "dot"))
+            )
           )
       }
-      
-      p <- p +
-        ggplot2::theme_minimal() +
-        ggplot2::labs(
-          color = "特徵類型",
-          shape = "顯著性 (p<0.05)"
-        ) +
-        ggplot2::scale_shape_manual(values = c(1, 16), labels = c("否", "是"))
-      
-      plotly::ggplotly(p, tooltip = c("x", "y", "colour", "shape"))
     })
     
-    # Price effects plot
-    output$price_effects_plot <- plotly::renderPlotly({
-      data <- filtered_data()
+    # 邊際效應圖
+    output$marginal_effect_plot <- plotly::renderPlotly({
+      data <- positive_data() %>%
+        arrange(desc(abs(marginal_effect_pct))) %>%
+        slice_head(n = 10)
       
       if (nrow(data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No data available"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
-      }
-      
-      # Filter for price-related features
-      price_data <- data %>%
-        dplyr::filter(feature_type == "price" & !is.na(incidence_rate_ratio) & convergence == "converged") %>%
-        dplyr::mutate(
-          is_significant = !is.na(p_value) & p_value < 0.05,
-          price_effect = case_when(
-            incidence_rate_ratio > 1 ~ "正向效應",
-            incidence_rate_ratio < 1 ~ "負向效應",
-            TRUE ~ "無效應"
+        plotly::plot_ly() %>%
+          plotly::add_text(x = 0.5, y = 0.5, text = "無資料", showlegend = FALSE)
+      } else {
+        data <- data %>%
+          mutate(
+            predictor_short = ifelse(nchar(predictor) > 15,
+                                   paste0(substr(predictor, 1, 12), "..."),
+                                   predictor)
           )
-        )
-      
-      if (nrow(price_data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No price data"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
+        
+        plotly::plot_ly(data,
+                       x = ~reorder(predictor_short, abs(marginal_effect_pct)),
+                       y = ~marginal_effect_pct,
+                       type = "bar",
+                       marker = list(color = ~ifelse(marginal_effect_pct > 50, "#DC3545",
+                                                   ifelse(marginal_effect_pct > 20, "#FFC107", "#28A745"))),
+                       text = ~paste0(round(marginal_effect_pct, 1), "%"),
+                       textposition = "outside",
+                       hoverinfo = "text",
+                       hovertext = ~paste0("每提升1單位", predictor, "，銷量增加", 
+                                         round(marginal_effect_pct, 1), "%")) %>%
+          plotly::layout(
+            title = "",
+            xaxis = list(title = "", tickangle = -45),
+            yaxis = list(title = "邊際效應 (%)"),
+            showlegend = FALSE
+          )
       }
-      
-      p <- ggplot2::ggplot(price_data, ggplot2::aes(x = predictor, y = incidence_rate_ratio,
-                                                   color = product_line_id, shape = is_significant)) +
-        ggplot2::geom_point(size = 4, alpha = 0.7) +
-        ggplot2::geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.5) +
-        ggplot2::theme_minimal() +
-        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
-        ggplot2::labs(
-          title = "價格因素效應分析",
-          x = "價格特徵",
-          y = "發生率比 (IRR)",
-          color = "產品線",
-          shape = "顯著性"
-        ) +
-        ggplot2::scale_shape_manual(values = c(1, 16), labels = c("否", "是"))
-      
-      plotly::ggplotly(p, tooltip = c("x", "y", "colour", "shape"))
     })
     
-    # Price comparison plot
-    output$price_comparison_plot <- plotly::renderPlotly({
-      data <- filtered_data()
-      
-      price_data <- data %>%
-        dplyr::filter(feature_type == "price" & !is.na(incidence_rate_ratio) & convergence == "converged")
-      
-      if (nrow(price_data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No price data"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
-      }
-      
-      # Summary by product line
-      price_summary <- price_data %>%
-        dplyr::group_by(product_line_id) %>%
-        dplyr::summarise(
-          avg_price_effect = mean(incidence_rate_ratio, na.rm = TRUE),
-          max_price_effect = max(incidence_rate_ratio, na.rm = TRUE),
-          min_price_effect = min(incidence_rate_ratio, na.rm = TRUE),
-          .groups = "drop"
-        )
-      
-      p <- ggplot2::ggplot(price_summary, ggplot2::aes(x = product_line_id)) +
-        ggplot2::geom_col(ggplot2::aes(y = avg_price_effect), alpha = 0.7, fill = "steelblue") +
-        ggplot2::geom_errorbar(ggplot2::aes(ymin = min_price_effect, ymax = max_price_effect), 
-                              width = 0.2) +
-        ggplot2::geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.5) +
-        ggplot2::theme_minimal() +
-        ggplot2::labs(
-          title = "產品線價格效應比較",
-          x = "產品線",
-          y = "平均發生率比"
-        )
-      
-      plotly::ggplotly(p)
-    })
-    
-    # Brand and category plot
-    output$brand_category_plot <- plotly::renderPlotly({
-      data <- filtered_data()
-      
-      brand_data <- data %>%
-        dplyr::filter(feature_type %in% c("brand", "factor") & !is.na(incidence_rate_ratio) & convergence == "converged") %>%
-        dplyr::mutate(
-          is_significant = !is.na(p_value) & p_value < 0.05,
-          effect_magnitude = abs(log(incidence_rate_ratio))
-        ) %>%
-        dplyr::arrange(desc(effect_magnitude)) %>%
-        dplyr::slice_head(n = 15)  # Top 15 for readability
-      
-      if (nrow(brand_data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No brand/category data"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
-      }
-      
-      p <- ggplot2::ggplot(brand_data, ggplot2::aes(y = reorder(predictor, effect_magnitude), 
-                                                   x = incidence_rate_ratio,
-                                                   color = product_line_id, 
-                                                   shape = is_significant)) +
-        ggplot2::geom_point(size = 3, alpha = 0.7) +
-        ggplot2::geom_vline(xintercept = 1, linetype = "dashed", alpha = 0.5) +
-        ggplot2::theme_minimal() +
-        ggplot2::labs(
-          title = "品牌與類別效應分析",
-          y = "特徵名稱",
-          x = "發生率比 (IRR)",
-          color = "產品線",
-          shape = "顯著性"
-        ) +
-        ggplot2::scale_shape_manual(values = c(1, 16), labels = c("否", "是"))
-      
-      plotly::ggplotly(p, tooltip = c("x", "y", "colour", "shape"))
-    })
-    
-    # Product line comparison plot
-    output$product_line_comparison_plot <- plotly::renderPlotly({
-      data <- filtered_data()
+    # 策略建議
+    output$strategy_recommendation <- renderUI({
+      data <- positive_data()
       
       if (nrow(data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No data available"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
+        return(p("暫無分析結果"))
       }
       
-      # Summary by product line and feature type
-      comparison_data <- data %>%
-        dplyr::filter(!is.na(incidence_rate_ratio) & convergence == "converged") %>%
-        dplyr::group_by(product_line_id, feature_type) %>%
-        dplyr::summarise(
-          avg_effect = mean(incidence_rate_ratio, na.rm = TRUE),
-          significant_count = sum(!is.na(p_value) & p_value < 0.05, na.rm = TRUE),
-          total_count = n(),
-          .groups = "drop"
-        ) %>%
-        dplyr::mutate(significance_rate = significant_count / total_count)
+      # 找出賽道冠軍和邊際冠軍
+      track_top <- data[1, ]
+      marginal_top <- data %>% arrange(desc(abs(marginal_effect_pct))) %>% slice(1)
       
-      p <- ggplot2::ggplot(comparison_data, ggplot2::aes(x = product_line_id, y = avg_effect, 
-                                                        fill = feature_type)) +
-        ggplot2::geom_col(position = "dodge", alpha = 0.7) +
-        ggplot2::geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.5) +
-        ggplot2::theme_minimal() +
-        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
-        ggplot2::labs(
-          title = "產品線特徵效應比較",
-          x = "產品線",
-          y = "平均發生率比",
-          fill = "特徵類型"
+      recommendation <- tags$div(
+        h5("💡 基於分析結果的行動建議："),
+        tags$ul(
+          tags$li(tags$strong("戰略重點："), 
+                  paste0("優先提升「", track_top$predictor, "」，",
+                        "此屬性從最低到最高可讓銷量相差", track_top$track_multiplier, "倍")),
+          tags$li(tags$strong("快速見效："),
+                  paste0("立即改善「", marginal_top$predictor, "」，",
+                        "每提升1單位可增加銷量", abs(marginal_top$marginal_effect_pct), "%")),
+          tags$li(tags$strong("資源配置："),
+                  "將80%資源投入賽道倍數>2的屬性，20%用於邊際效應>50%的快速優化")
+        ),
+        br(),
+        tags$div(class = "alert alert-success",
+          tags$strong("執行建議："),
+          "結合「戰略+戰術」雙重優化策略，長期布局與短期成效並重"
         )
+      )
       
-      plotly::ggplotly(p)
+      return(recommendation)
     })
     
-    # Detailed table
-    output$feature_analysis_table <- renderDT({
-      data <- filtered_data()
+    # 詳細表格
+    output$analysis_table <- DT::renderDT({
+      data <- positive_data()
+      
+      # 除錯訊息
+      cat("精準模型詳細表格資料筆數:", nrow(data), "\n")
       
       if (nrow(data) == 0) {
-        return(data.frame(Message = "無可用資料"))
+        return(data.frame(訊息 = "無屬性資料"))
       }
       
-      # Prepare table data
       table_data <- data %>%
-        dplyr::filter(convergence == "converged") %>%
-        dplyr::select(product_line_id, predictor, feature_type, coefficient, incidence_rate_ratio, 
-                     std_error, p_value, conf_low, conf_high, aic, sample_size) %>%
-        dplyr::mutate(
-          coefficient = round(coefficient, 4),
-          incidence_rate_ratio = round(incidence_rate_ratio, 4),
-          std_error = round(std_error, 4),
-          p_value = round(p_value, 6),
-          conf_low = round(conf_low, 4),
-          conf_high = round(conf_high, 4),
-          significance = ifelse(!is.na(p_value) & p_value < 0.05, "顯著", "不顯著"),
-          feature_type_chinese = case_when(
-            feature_type == "price" ~ "價格",
-            feature_type == "brand" ~ "品牌",
-            feature_type == "numeric" ~ "數值",
-            feature_type == "factor" ~ "類別",
-            feature_type == "positioning" ~ "定位",
-            TRUE ~ feature_type
-          )
+        dplyr::select(
+          predictor, 
+          track_multiplier,
+          marginal_effect_pct,
+          practical_meaning,
+          coefficient,
+          p_value,
+          sample_size
         ) %>%
-        dplyr::select(product_line_id, predictor, feature_type_chinese, coefficient, incidence_rate_ratio,
-                     std_error, p_value, significance, conf_low, conf_high, aic, sample_size)
+        mutate(
+          coefficient = round(coefficient, 4),
+          p_value = round(p_value, 4),
+          significance = ifelse(p_value < 0.001, "***",
+                              ifelse(p_value < 0.01, "**",
+                                    ifelse(p_value < 0.05, "*", "")))
+        )
       
-      # Create column names in Chinese
-      colnames(table_data) <- c("產品線", "特徵名稱", "特徵類型", "係數", "發生率比", "標準誤", 
-                               "P值", "顯著性", "信賴區間下限", "信賴區間上限", "AIC", "樣本數")
+      colnames(table_data) <- c("屬性名稱", "賽道倍數", "邊際效應%", 
+                               "商業意義", "係數", "P值", "樣本數", "顯著性")
       
-      datatable(table_data,
+      DT::datatable(table_data,
                 options = list(
-                  pageLength = 15,
+                  pageLength = 10,
                   scrollX = TRUE,
                   dom = 'Bfrtip',
                   buttons = list(
-                    list(extend = 'excel', text = '下載Excel', filename = '精準模型分析結果')
-                  )
+                    list(extend = 'excel', text = '下載Excel', 
+                         filename = 'InsightForge_屬性影響力分析')
+                  ),
+                  order = list(list(1, 'desc'))  # 預設按賽道倍數排序
                 ),
                 extensions = c("Buttons"),
                 rownames = FALSE) %>%
-        formatStyle("顯著性", 
-                   backgroundColor = styleEqual("顯著", "#d4edda"),
-                   color = styleEqual("顯著", "#155724"))
+        formatStyle("賽道倍數",
+                   backgroundColor = styleInterval(c(1.2, 2.0), 
+                                                 c("white", "#FFF3CD", "#F8D7DA")),
+                   fontWeight = styleInterval(2.0, c("normal", "bold"))) %>%
+        formatStyle("顯著性",
+                   color = styleEqual(c("*", "**", "***"), 
+                                    c("#28A745", "#FFC107", "#DC3545")))
     })
     
-    # Model quality plots
-    output$r_squared_plot <- plotly::renderPlotly({
-      data <- filtered_data()
+    # ------------ AI Precision Marketing Insights Generation -------------
+    ai_insight_result <- reactiveVal(NULL)
+    
+    # Get OpenAI API key from environment
+    gpt_key <- Sys.getenv("OPENAI_API_KEY", "")
+    if (!nzchar(gpt_key)) {
+      gpt_key <- NULL
+    }
+    
+    observeEvent(input$generate_precision_insight, {
+      data <- positive_data()
       
-      if (nrow(data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No data available"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
+      if (is.null(data) || nrow(data) == 0) {
+        showNotification("無可用的屬性分析資料", type = "warning")
+        return()
       }
       
-      # Calculate pseudo R-squared based on deviance
-      quality_data <- data %>%
-        dplyr::filter(!is.na(aic) & convergence == "converged") %>%
-        dplyr::group_by(product_line_id) %>%
-        dplyr::summarise(
-          avg_aic = mean(aic, na.rm = TRUE),
-          min_aic = min(aic, na.rm = TRUE),
-          model_count = n(),
-          .groups = "drop"
+      if (is.null(gpt_key)) {
+        showNotification("OpenAI API 金鑰未設定。AI 分析功能已停用。", type = "error")
+        return()
+      }
+      
+      withProgress(message = "生成 InsightForge 360 精準行銷洞察中...", value = 0, {
+        incProgress(0.2, detail = "準備屬性資料...")
+        
+        # Prepare top attributes data for AI analysis
+        top_attributes <- data %>%
+          slice_head(n = 10)
+        
+        # Convert to structured format for GPT
+        attributes_summary <- data.frame(
+          屬性 = top_attributes$predictor,
+          賽道倍數 = top_attributes$track_multiplier,
+          邊際效應 = paste0(top_attributes$marginal_effect_pct, "%"),
+          商業意義 = top_attributes$practical_meaning
         )
-      
-      if (nrow(quality_data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No quality data"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
-      }
-      
-      p <- ggplot2::ggplot(quality_data, ggplot2::aes(x = product_line_id, y = avg_aic)) +
-        ggplot2::geom_col(fill = "lightblue", alpha = 0.7) +
-        ggplot2::theme_minimal() +
-        ggplot2::labs(
-          title = "產品線模型品質 (AIC值)",
-          x = "產品線",
-          y = "平均AIC值"
-        ) +
-        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
-      
-      plotly::ggplotly(p)
-    })
-    
-    # Model performance plot
-    output$model_performance_plot <- plotly::renderPlotly({
-      data <- filtered_data()
-      
-      if (nrow(data) == 0) {
-        p <- ggplot2::ggplot() + 
-          ggplot2::geom_text(ggplot2::aes(x = 0.5, y = 0.5, label = "No data available"), size = 6) +
-          ggplot2::theme_void()
-        return(plotly::ggplotly(p))
-      }
-      
-      # Model convergence summary
-      performance_data <- data %>%
-        dplyr::count(product_line_id, convergence) %>%
-        dplyr::group_by(product_line_id) %>%
-        dplyr::mutate(
-          total = sum(n),
-          percentage = n / total * 100
-        ) %>%
-        dplyr::ungroup() %>%
-        dplyr::mutate(
-          convergence_chinese = case_when(
-            convergence == "converged" ~ "收斂",
-            convergence == "failed" ~ "失敗",
-            grepl("error", convergence) ~ "錯誤",
-            TRUE ~ "其他"
+        
+        attributes_json <- jsonlite::toJSON(attributes_summary, dataframe = "rows", auto_unbox = TRUE)
+        
+        incProgress(0.4, detail = "分析關鍵屬性...")
+        
+        # OpenAI functions should already be loaded from union_production_test.R
+        if (!exists("fn_chat_api")) {
+          stop("OpenAI functions not loaded. Please check union_production_test.R initialization.")
+        }
+        
+        # Create prompt based on martech report examples
+        sys <- list(role = "system", content = "你是專業的電商行銷顧問，擅長精準行銷分析和銷售策略制定。請用繁體中文回答。")
+        usr <- list(
+          role = "user",
+          content = paste0(
+            "根據以下產品屬性影響力分析數據，提供 InsightForge 360 精準行銷洞察報告。",
+            "\n\n## 關鍵屬性數據：",
+            "\n", attributes_json,
+            "\n\n請按以下格式輸出：",
+            "\n\n## InsightForge 360 - 精準行銷洞察報告",
+            "\n\n### 📊 產品屬性重要性分析",
+            "\n\n#### 1. 關鍵正向屬性（前5項）",
+            "\n針對賽道倍數最高的5個屬性，各提供一句20字內的轉化放大語句，可直接用於亞馬遜商品頁。",
+            "\n\n#### 2. 行銷文案建議",
+            "\n基於最重要的3個屬性，提供：",
+            "\n- 主圖標籤建議（如：不鏽鋼刀片 + 2年保固）",
+            "\n- Bullet Point 排序建議",
+            "\n- A+ Content 重點呈現方式",
+            "\n\n#### 3. 關鍵字廣告投放建議",
+            "\n根據屬性重要性，建議3-5個Amazon PPC關鍵字組合，格式：",
+            "\n- 關鍵字（如：開罐器 不鏽鋼）",
+            "\n- 匹配類型（Exact/Phrase/Broad）",
+            "\n- 競價策略（如：高於類目平均+15%）",
+            "\n\n#### 4. 促銷策略建議",
+            "\n結合高影響力屬性，建議適合的促銷方式：",
+            "\n- Lightning Deal 時機",
+            "\n- Coupon 設定",
+            "\n- Subscribe & Save 策略",
+            "\n\n**注意**：",
+            "\n- 保持專業但易懂的語言",
+            "\n- 提供具體可執行的建議",
+            "\n- 文案要符合Amazon規範",
+            "\n- 限制在 500 字內"
           )
         )
+        
+        incProgress(0.6, detail = "呼叫 AI 分析...")
+        
+        txt <- fn_chat_api(list(sys, usr), gpt_key)
+        
+        incProgress(0.8, detail = "處理 AI 回應...")
+        
+        ai_insight_result(txt)
+        
+        # Show AI insights section
+        shinyjs::show("ai_insights_section")
+        
+        # Scroll to AI insights
+        shinyjs::runjs(paste0("document.getElementById('", session$ns("ai_insights_section"), "').scrollIntoView({behavior: 'smooth'});"))
+        
+        incProgress(1.0, detail = "分析完成！")
+      })
+    })
+    
+    # Render AI insights
+    output$precision_insight_output <- renderUI({
+      txt <- ai_insight_result()
       
-      p <- ggplot2::ggplot(performance_data, ggplot2::aes(x = product_line_id, y = percentage, 
-                                                         fill = convergence_chinese)) +
-        ggplot2::geom_col(position = "stack") +
-        ggplot2::theme_minimal() +
-        ggplot2::labs(
-          title = "模型收斂表現",
-          x = "產品線",
-          y = "百分比 (%)",
-          fill = "收斂狀態"
-        ) +
-        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+      if (is.null(txt)) {
+        return(NULL)
+      }
       
-      plotly::ggplotly(p)
+      # Clean and convert to HTML
+      res <- fn_strip_code_fence(txt)
+      if (requireNamespace("markdown", quietly = TRUE)) {
+        html <- markdown::markdownToHTML(text = res, fragment.only = TRUE)
+        HTML(html)
+      } else {
+        # Fallback
+        HTML(paste0("<pre>", res, "</pre>"))
+      }
     })
     
-    # Reset filters
-    observeEvent(input$reset_filters, {
-      updateCheckboxGroupInput(session, "feature_types", 
-                             selected = c("price", "brand", "numeric", "factor", "positioning"))
-      updateCheckboxInput(session, "show_significant_only", value = FALSE)
-      updateNumericInput(session, "top_n_features", value = 20)
-      updateSelectInput(session, "sort_by", selected = "p_value")
-      updateRadioButtons(session, "chart_orientation", selected = "horizontal")
+    # ------------ AI Product Development Suggestions Generation -------------
+    ai_product_result <- reactiveVal(NULL)
+    
+    observeEvent(input$generate_product_development, {
+      data <- positive_data()
+      
+      if (is.null(data) || nrow(data) == 0) {
+        showNotification("無可用的產品屬性分析資料", type = "warning")
+        return()
+      }
+      
+      if (is.null(gpt_key)) {
+        showNotification("OpenAI API 金鑰未設定。AI 分析功能已停用。", type = "error")
+        return()
+      }
+      
+      withProgress(message = "生成 AI 新產品開發建議中...", value = 0, {
+        incProgress(0.2, detail = "準備正向影響屬性資料...")
+        
+        # Prepare positive coefficient variables for product development suggestions
+        positive_vars <- data %>%
+          filter(coefficient > 0) %>%
+          arrange(desc(coefficient)) %>%
+          slice_head(n = 10)
+        
+        # Debug: Check positive vars data
+        cat("正向變數數量:", nrow(positive_vars), "\n")
+        if (nrow(positive_vars) > 0) {
+          cat("前3個正向變數:\n")
+          print(positive_vars %>% select(predictor, coefficient, track_multiplier, marginal_effect_pct) %>% head(3))
+        }
+        
+        # Create structured summary for AI analysis
+        if (nrow(positive_vars) == 0) {
+          product_dev_summary <- "無正向影響屬性資料"
+        } else {
+          product_dev_summary <- positive_vars %>%
+            mutate(
+              var_description = paste0(
+                predictor, ": 係數=", round(coefficient, 3),
+                ", 賽道倍數=", track_multiplier, 
+                ", 邊際效應=", marginal_effect_pct, "%"
+              )
+            ) %>%
+            pull(var_description)
+        }
+        
+        # Debug: Check summary
+        cat("產品開發摘要長度:", length(product_dev_summary), "\n")
+        if (length(product_dev_summary) > 0) {
+          cat("前2個摘要項目:\n")
+          cat(paste(head(product_dev_summary, 2), collapse = "\n"), "\n")
+        }
+        
+        incProgress(0.4, detail = "分析產品開發機會...")
+        
+        # Use prompt from app_configs
+        product_prompt <- app_configs$list_openai_prompt$poisson_analysis$product_development_strategy
+        
+        # Create AI prompt using centralized template
+        attributes_text <- paste(product_dev_summary, collapse = "\n")
+        cat("要傳給AI的屬性資料:\n", attributes_text, "\n")
+        
+        user_content <- gsub("{positive_attributes}", 
+                            attributes_text, 
+                            product_prompt$user_prompt_template, fixed = TRUE)
+        
+        # Debug: Check if replacement worked
+        if (grepl("{positive_attributes}", user_content, fixed = TRUE)) {
+          cat("⚠️ Warning: 模板變數替換失敗!\n")
+        } else {
+          cat("✅ 模板變數替換成功\n")
+        }
+        
+        # Handle system prompt template variable
+        system_content <- gsub("{system_prompts.product_strategist.content}", 
+                              app_configs$list_openai_prompt$system_prompts$product_strategist$content,
+                              product_prompt$system_prompt, fixed = TRUE)
+        
+        sys <- list(role = "system", content = system_content)
+        usr <- list(role = "user", content = user_content)
+        
+        incProgress(0.6, detail = "呼叫 AI 產品開發分析...")
+        
+        # Use the model specified in YAML configuration
+        txt <- fn_chat_api(list(sys, usr), gpt_key, model = product_prompt$model)
+        
+        incProgress(0.8, detail = "處理 AI 回應...")
+        
+        ai_product_result(txt)
+        
+        # Show AI product development section
+        shinyjs::show("ai_product_development_section")
+        
+        # Scroll to AI product development section
+        shinyjs::runjs(paste0("document.getElementById('", session$ns("ai_product_development_section"), "').scrollIntoView({behavior: 'smooth'});"))
+        
+        incProgress(1.0, detail = "產品開發建議生成完成！")
+      })
     })
     
-    # Component status
-    output$component_status <- renderText({
-      switch(component_status(),
-             idle = "準備顯示特徵分析",
-             loading = "載入分析資料中...",
-             ready = paste0("已載入 ", nrow(poisson_data()), " 筆特徵分析結果"),
-             error = "載入資料時發生錯誤",
-             component_status())
+    # Render AI product development suggestions
+    output$product_development_output <- renderUI({
+      txt <- ai_product_result()
+      
+      if (is.null(txt)) {
+        return(NULL)
+      }
+      
+      # Clean and convert to HTML
+      res <- fn_strip_code_fence(txt)
+      if (requireNamespace("markdown", quietly = TRUE)) {
+        html <- markdown::markdownToHTML(text = res, fragment.only = TRUE)
+        HTML(html)
+      } else {
+        # Fallback
+        HTML(paste0("<pre>", res, "</pre>"))
+      }
     })
     
-    # Return reactive values
+    # 返回響應式值
     return(list(
-      poisson_data = poisson_data,
-      filtered_data = filtered_data,
-      component_status = component_status
+      analysis_data = analysis_data,
+      positive_data = positive_data,
+      component_status = component_status,
+      ai_insight_result = ai_insight_result,
+      ai_product_result = ai_product_result
     ))
   })
 }
 
-# Component wrapper -----------------------------------------------------------
-#' poissonFeatureAnalysisComponent
-#' 
-#' Implements a comprehensive product feature Poisson analysis component.
-#' 
-#' @param id Character string. The module ID used for namespacing inputs and outputs.
-#' @param app_data_connection Database connection object or list. The data connection supporting Enhanced Data Access pattern (R116).
-#'        Can be a DBI connection, a list with getter functions, a file path, or NULL if no database access is needed.
-#' @param config List or reactive expression. Configuration parameters for customizing component behavior (optional).
-#'        If reactive, will be re-evaluated when dependencies change.
-#' @param translate Function. Translation function for UI text elements (defaults to identity function).
-#'        Should accept a string and return a translated string.
-#' @return A list containing UI and server functions structured according to the Connected Component Principle (MP56).
-#'         The UI element contains 'filter' and 'display' components, and the server function initializes component functionality.
-#' @examples
-#' # Basic usage
-#' featureComp <- poissonFeatureAnalysisComponent("feature_analysis")
-#' 
-#' # Usage with database connection
-#' featureComp <- poissonFeatureAnalysisComponent(
-#'   id = "feature_analysis",
-#'   app_data_connection = app_conn,
-#'   config = list(platform_id = "cbz")
-#' )
-#' @export
-poissonFeatureAnalysisComponent <- function(id, app_data_connection = NULL, config = NULL, translate = identity) {
+# 組件包裝器 ------------------------------------------------------------------
+poissonFeatureAnalysisComponent <- function(id, app_data_connection = NULL, 
+                                                       config = NULL, translate = identity) {
   list(
-    ui = list(filter = poissonFeatureAnalysisFilterUI(id, translate),
-              display = poissonFeatureAnalysisDisplayUI(id, translate)),
+    ui = list(
+      filter = poissonFeatureAnalysisFilterUI(id, translate),
+      display = poissonFeatureAnalysisUI(id, translate)
+    ),
     server = function(input, output, session) {
       poissonFeatureAnalysisServer(id, app_data_connection, config, session)
     }

@@ -21,7 +21,39 @@ options(app.verbose = getOption("app.verbose", FALSE))
 
 
 # -----------------------------------------------------------------------------
-# 2. Package initialization
+# 2. Load environment variables from .env file
+# -----------------------------------------------------------------------------
+# Following MP099: Real-time progress reporting
+message("UPDATE_MODE: Checking for .env file...")
+
+# Check for .env file in APP_DIR (project root)
+env_file <- file.path(APP_DIR, ".env")
+if (file.exists(env_file)) {
+  # Use dotenv package if available, otherwise use readRenviron
+  if (requireNamespace("dotenv", quietly = TRUE)) {
+    dotenv::load_dot_env(file = env_file)
+    message("UPDATE_MODE: ✅ Environment variables loaded from .env using dotenv package")
+  } else {
+    readRenviron(env_file)
+    message("UPDATE_MODE: ✅ Environment variables loaded from .env using readRenviron")
+  }
+  
+  # Verify critical environment variables for UPDATE_MODE
+  # Check for database-related variables
+  db_vars_check <- c("EBY_SSH_HOST", "EBY_SQL_HOST", "EBY_SQL_DATABASE")
+  for (var in db_vars_check) {
+    if (nzchar(Sys.getenv(var))) {
+      message(sprintf("UPDATE_MODE: ✓ %s is set", var))
+    } else {
+      warning(sprintf("UPDATE_MODE: ⚠ %s is not set", var))
+    }
+  }
+} else {
+  warning("UPDATE_MODE: No .env file found in ", APP_DIR, " - environment variables may not be available")
+}
+
+# -----------------------------------------------------------------------------
+# 3. Package initialization
 # -----------------------------------------------------------------------------
 source(file.path(GLOBAL_DIR, "04_utils", "fn_initialize_packages.R"))
 source(file.path(GLOBAL_DIR, "04_utils", "base", "fn_library2.R"))
@@ -30,7 +62,7 @@ initialize_packages(mode = OPERATION_MODE,
                     force_update = FALSE)
 
 # -----------------------------------------------------------------------------
-# 3. Load global scripts in deterministic order
+# 4. Load global scripts in deterministic order
 # -----------------------------------------------------------------------------
 source(file.path(GLOBAL_DIR, "04_utils", "fn_get_r_files_recursive.R"))
 load_dirs <- c(
@@ -56,7 +88,7 @@ total_files_loaded <- 0
 total_errors <- 0
 
 for (d in load_dirs) {
-  dir_path <- file.path(.InitEnv$GLOBAL_DIR, d)
+  dir_path <- file.path(GLOBAL_DIR, d)
   if (!dir.exists(dir_path)) {
     cat("⏭️  Skipping non-existent directory:", d, "\n")
     next
@@ -102,7 +134,7 @@ if (total_errors > 0) {
 cat("🎯 Global scripts loading completed!\n\n")
 
 # -----------------------------------------------------------------------------
-# 4. Finalize
+# 5. Finalize
 # -----------------------------------------------------------------------------
 INITIALIZATION_COMPLETED <- TRUE
 message("UPDATE_MODE initialization finished. Databases available: ",

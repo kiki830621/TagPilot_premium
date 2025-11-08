@@ -7,7 +7,7 @@ This document describes the filtering strategy used in the `positionTable` compo
 ## Problem Context
 
 Position table data typically contains:
-- **Essential columns**: `product_id`, `brand`, `product_line_id`, `rating`, `sales`
+- **Essential columns**: `item_id`, `brand`, `product_line_id`, `rating`, `sales`
 - **Attribute columns**: Product characteristics (e.g., "配送快速", "品質優良", "價格實惠")
 - **High sparsity**: Many attribute columns have significant NA values
 - **Cross-contamination risk**: Different product lines cannot be meaningfully compared
@@ -110,7 +110,7 @@ The function provides clear logging:
 🔧 開始簡單篩選 Position Table...
   📊 原始資料：50 行 × 40 列
   🔧 可篩選欄位：35 個
-  🛡️  必保留欄位：product_id, brand, product_line_id, rating, sales
+  🛡️  必保留欄位：item_id, brand, product_line_id, rating, sales
   ✂️  步驟1 - 移除空行：保留 45/50 行
   ✂️  步驟2 - 移除空列：保留 20/35 屬性欄位（比例 >= 0.3）
 🎯 簡單篩選完成：45 行 × 25 列

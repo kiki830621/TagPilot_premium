@@ -1,0 +1,276 @@
+
+================================================================================
+🚀 PRINCIPLE-BASED DEBUGGING: ISSUE_105 and ISSUE_106 FIX VERIFICATION
+================================================================================
+Timestamp: 2025-09-22 22:32:51 
+Working Directory: /Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/MAMBA 
+--------------------------------------------------------------------------------
+
+📦 Loading Components Under Test...
+✓ positionIdealRate.R loaded successfully
+
+================================================================================
+📊 TEST DATA GENERATION
+================================================================================
+
+================================================================================
+🏃 RUNNING COMPREHENSIVE TESTS
+================================================================================
+
+🔬 TEST SCENARIO 1: Standard Positive Values
+
+--------------------------------------------------------------------------------
+🧪 TEST: Positive Values - IdealRate 
+--------------------------------------------------------------------------------
+📊 Test Data Statistics:
+  • Number of products: 15 
+  • Number of attributes: 26 
+  • Ideal value range: [10.00, 90.00]
+  • Cross-attribute average: 50.00
+
+📍 Testing 'cross_average' method (MK03 principle):
+  • Cross-attribute average threshold: 50.00
+  • Expected key factors: 13 
+  • Actual key factors found: 13 
+  ✅ PASS: Correct number of key factors identified
+
+📍 Testing 'top_n' method (legacy behavior):
+  • Requested top N: 8 
+  • Actual factors selected: 8 
+  ✅ PASS: Correct number of top factors selected
+
+📍 Verifying ISSUE_105 fix (dynamic factor count):
+  ✅ PASS: Not showing fixed 26 factors
+
+--------------------------------------------------------------------------------
+🎯 STRATEGY COMPONENT TEST: Positive Values - Strategy 
+--------------------------------------------------------------------------------
+📊 Strategy Component Analysis:
+  • Total attributes: 26 
+  • Cross-attribute average: 50.00
+  • Factors above average: 13 
+  • Key factors selected: 10 
+  • Limited to 10?: TRUE 
+
+📍 Verifying ISSUE_106 fix (not all points on scatter):
+  • Old behavior would select: 26 factors (all positive)
+  • New behavior selects: 10 factors (above average)
+  ✅ PASS: No longer selecting all positive values
+
+🔬 TEST SCENARIO 2: Mixed Positive/Negative Values
+
+--------------------------------------------------------------------------------
+🧪 TEST: Mixed Values - IdealRate 
+--------------------------------------------------------------------------------
+📊 Test Data Statistics:
+  • Number of products: 10 
+  • Number of attributes: 20 
+  • Ideal value range: [-40.00, 90.00]
+  • Cross-attribute average: 22.50
+
+📍 Testing 'cross_average' method (MK03 principle):
+  • Cross-attribute average threshold: 22.50
+  • Expected key factors: 10 
+  • Actual key factors found: 10 
+  ✅ PASS: Correct number of key factors identified
+
+📍 Testing 'top_n' method (legacy behavior):
+  • Requested top N: 8 
+  • Actual factors selected: 8 
+  ✅ PASS: Correct number of top factors selected
+
+📍 Verifying ISSUE_105 fix (dynamic factor count):
+  ✅ PASS: Not showing fixed 26 factors
+
+--------------------------------------------------------------------------------
+🎯 STRATEGY COMPONENT TEST: Mixed Values - Strategy 
+--------------------------------------------------------------------------------
+📊 Strategy Component Analysis:
+  • Total attributes: 20 
+  • Cross-attribute average: 22.50
+  • Factors above average: 10 
+  • Key factors selected: 10 
+  • Limited to 10?: FALSE 
+
+📍 Verifying ISSUE_106 fix (not all points on scatter):
+  • Old behavior would select: 10 factors (all positive)
+  • New behavior selects: 10 factors (above average)
+  ❌ FAIL: Still selecting all positive values
+
+🔬 TEST SCENARIO 3: All Negative Values (Edge Case)
+
+--------------------------------------------------------------------------------
+🧪 TEST: Negative Values - IdealRate 
+--------------------------------------------------------------------------------
+📊 Test Data Statistics:
+  • Number of products: 8 
+  • Number of attributes: 15 
+  • Ideal value range: [-90.00, -10.00]
+  • Cross-attribute average: -50.00
+
+📍 Testing 'cross_average' method (MK03 principle):
+  • Cross-attribute average threshold: -50.00
+  • Expected key factors: 7 
+  • Actual key factors found: 7 
+  ✅ PASS: Correct number of key factors identified
+
+📍 Testing 'top_n' method (legacy behavior):
+  • Requested top N: 8 
+  • Actual factors selected: 8 
+  ✅ PASS: Correct number of top factors selected
+
+📍 Verifying ISSUE_105 fix (dynamic factor count):
+  ✅ PASS: Not showing fixed 26 factors
+
+--------------------------------------------------------------------------------
+🎯 STRATEGY COMPONENT TEST: Negative Values - Strategy 
+--------------------------------------------------------------------------------
+📊 Strategy Component Analysis:
+  • Total attributes: 15 
+  • Cross-attribute average: -50.00
+  • Factors above average: 7 
+  • Key factors selected: 7 
+  • Limited to 10?: FALSE 
+
+📍 Verifying ISSUE_106 fix (not all points on scatter):
+  • Old behavior would select: 0 factors (all positive)
+  • New behavior selects: 7 factors (above average)
+  ✅ PASS: No longer selecting all positive values
+
+🔬 TEST SCENARIO 4: Sparse Values Pattern
+
+--------------------------------------------------------------------------------
+🧪 TEST: Sparse Values - IdealRate 
+--------------------------------------------------------------------------------
+📊 Test Data Statistics:
+  • Number of products: 12 
+  • Number of attributes: 30 
+  • Ideal value range: [0.00, 89.40]
+  • Cross-attribute average: 13.12
+
+📍 Testing 'cross_average' method (MK03 principle):
+  • Cross-attribute average threshold: 13.12
+  • Expected key factors: 5 
+  • Actual key factors found: 5 
+  ✅ PASS: Correct number of key factors identified
+
+📍 Testing 'top_n' method (legacy behavior):
+  • Requested top N: 8 
+  • Actual factors selected: 8 
+  ✅ PASS: Correct number of top factors selected
+
+📍 Verifying ISSUE_105 fix (dynamic factor count):
+  ✅ PASS: Not showing fixed 26 factors
+
+--------------------------------------------------------------------------------
+🎯 STRATEGY COMPONENT TEST: Sparse Values - Strategy 
+--------------------------------------------------------------------------------
+📊 Strategy Component Analysis:
+  • Total attributes: 30 
+  • Cross-attribute average: 13.12
+  • Factors above average: 5 
+  • Key factors selected: 5 
+  • Limited to 10?: FALSE 
+
+📍 Verifying ISSUE_106 fix (not all points on scatter):
+  • Old behavior would select: 5 factors (all positive)
+  • New behavior selects: 5 factors (above average)
+  ❌ FAIL: Still selecting all positive values
+
+🔬 TEST SCENARIO 5: Many Attributes (>20)
+
+--------------------------------------------------------------------------------
+🧪 TEST: Many Attributes - IdealRate 
+--------------------------------------------------------------------------------
+📊 Test Data Statistics:
+  • Number of products: 20 
+  • Number of attributes: 35 
+  • Ideal value range: [10.00, 90.00]
+  • Cross-attribute average: 50.00
+
+📍 Testing 'cross_average' method (MK03 principle):
+  • Cross-attribute average threshold: 50.00
+  • Expected key factors: 17 
+  • Actual key factors found: 17 
+  ✅ PASS: Correct number of key factors identified
+
+📍 Testing 'top_n' method (legacy behavior):
+  • Requested top N: 8 
+  • Actual factors selected: 8 
+  ✅ PASS: Correct number of top factors selected
+
+📍 Verifying ISSUE_105 fix (dynamic factor count):
+  ✅ PASS: Not showing fixed 26 factors
+
+--------------------------------------------------------------------------------
+🎯 STRATEGY COMPONENT TEST: Many Attributes - Strategy 
+--------------------------------------------------------------------------------
+📊 Strategy Component Analysis:
+  • Total attributes: 35 
+  • Cross-attribute average: 50.00
+  • Factors above average: 17 
+  • Key factors selected: 10 
+  • Limited to 10?: TRUE 
+
+📍 Verifying ISSUE_106 fix (not all points on scatter):
+  • Old behavior would select: 35 factors (all positive)
+  • New behavior selects: 10 factors (above average)
+  ✅ PASS: No longer selecting all positive values
+
+================================================================================
+🔗 INTEGRATION AND MK03 PRINCIPLE COMPLIANCE
+================================================================================
+
+📋 MK03 Principle Verification:
+--------------------------------------------------------------------------------
+✓ MK03 Compliance Check:
+  1. Ideal point treated as single m-dimensional vector: ✅
+  2. Cross-attribute average calculated correctly: ✅
+  3. Key factors selected where I_j > mean(I): ✅
+
+📊 Component Agreement Analysis:
+  • IdealRate identified: 10 key factors
+  • Strategy identified: 10 key factors
+  • Common factors: 10 
+  • Agreement rate: 100.0%
+  ✅ PASS: Components show good agreement
+
+================================================================================
+📊 FINAL TEST REPORT
+================================================================================
+Test execution completed at: 2025-09-22 22:32:51 
+--------------------------------------------------------------------------------
+
+📈 Test Summary:
+  • Total tests run: 10 
+  • Tests passed: 8 
+  • Tests failed: 2 
+  • Pass rate: 80.0%
+
+🔍 Issue Resolution Status:
+--------------------------------------------------------------------------------
+📌 ISSUE_105 (IdealRate showing fixed 26 factors):
+  ✅ FIXED: Dynamic factor selection working correctly
+  • Now using cross-attribute average threshold (MK03)
+  • Factor count varies based on actual data
+
+📌 ISSUE_106 (Strategy showing all positive points):
+  ❌ NOT FIXED: Still selecting all positive values
+
+🏆 MK03 Principle Compliance:
+  • Agreement between components: 100.0%
+  ✅ Both components follow MK03 principle correctly
+
+================================================================================
+🎯 FINAL VERDICT
+================================================================================
+❌ FAILURE: Issues remain unfixed
+  • ISSUE_106 still needs attention
+
+================================================================================
+Test script completed successfully.
+================================================================================
+
+          used (Mb) gc trigger (Mb) limit (Mb) max used (Mb)
+Ncells  615993 32.9    1322340 70.7         NA  1322340 70.7
+Vcells 1071533  8.2    8388608 64.0     131072  2031673 15.6

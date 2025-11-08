@@ -1,6 +1,10 @@
 # M01_P06_00.R
 # Implementation of M01 (External Raw Data Connection) for eBay platform (06/EBY)
 #
+# ⚠️ SECURITY WARNING: This archived file contains hardcoded passwords
+# This is a historical archive and should NOT be used in production
+# For current secure implementations, see scripts/global_scripts/02_db_utils/
+#
 # This script implements the platform-specific version of the M01 module
 # as defined in M01/M01.md.
 #

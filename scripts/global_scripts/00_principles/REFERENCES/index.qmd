@@ -1,0 +1,261 @@
+---
+title: "REFERENCES: Bibliography and Citations"
+subtitle: "Organized collection of sources informing the MAMBA principles and architecture"
+chapter: "REFERENCES"
+category: "bibliography"
+number: "REFERENCES"
+date-created: "2025-08-23"
+date-modified: "2025-08-23"
+author: "Claude"
+type: "index"
+law: "Knowledge Management"
+article: "Bibliography"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-tools: true
+    number-sections: true
+---
+
+# Overview {#overview}
+
+This REFERENCES collection organizes all sources that inform the development of MAMBA principles, rules, and architectural decisions. References are categorized by type for easy discovery and proper attribution.
+
+## Reference Categories {#categories}
+
+### 📚 Academic Papers {#academic}
+
+Research papers, journal articles, and academic publications that provide theoretical foundations.
+
+**Location**: `academic/`
+
+**Contents**:
+- Software engineering research
+- Data management studies  
+- User interface design papers
+- Statistical methodology papers
+- Category theory and functional programming research
+
+### 📋 Standards & Specifications {#standards}
+
+Official standards, specifications, and formal guidelines from standards bodies.
+
+**Location**: `standards/`
+
+**Contents**:
+- ISO software engineering standards
+- IEEE specifications
+- W3C web standards
+- ANSI database standards
+- R language specifications
+- SQL standards
+
+### 📖 Books & Authoritative Texts {#books}
+
+Complete books and authoritative reference texts.
+
+**Location**: `books/`
+
+**Contents**:
+- Software engineering textbooks
+- Database design principles
+- Statistical computing references
+- R programming guides
+- Shiny development resources
+
+### ⚖️ Legal & Regulatory {#legal}
+
+Legal documents, regulations, and constitutional references that inform data handling and system design.
+
+**Location**: `legal_regulatory/`
+
+**Current Contents**:
+- [中華民國憲法](legal_regulatory/中華民國憲法.rtf) - Constitutional reference for regulatory compliance
+
+### 🌐 Online Resources {#online}
+
+Web-based documentation, tutorials, and authoritative online sources.
+
+**Location**: `online_resources/`
+
+**Contents**:
+- Framework documentation
+- API references
+- Best practices guides
+- Community standards
+- Official documentation sites
+
+### 🏗️ Frameworks & Libraries {#frameworks}
+
+Documentation and references for specific frameworks and libraries used in the project.
+
+**Location**: `frameworks/`
+
+**Contents**:
+- Shiny framework documentation
+- R package references
+- Database system documentation
+- UI framework guides (bs4Dash)
+- Statistical package documentation
+
+### 🏭 Industry Practices {#industry}
+
+Industry best practices, design patterns, and established methodologies.
+
+**Location**: `industry_practices/`
+
+**Contents**:
+- Software architecture patterns
+- Database design patterns
+- UI/UX best practices
+- Agile/DevOps methodologies
+- Code organization principles
+
+## Reference Format Standards {#format}
+
+### Academic Citations
+
+Use standard academic format with DOI when available:
+
+```
+Author, A. A. (Year). Title of paper. *Journal Name*, Volume(Issue), pages. https://doi.org/xxx
+```
+
+### Book Citations
+
+```
+Author, A. A. (Year). *Book Title*. Publisher. ISBN: xxx
+```
+
+### Online Resources
+
+```
+Organization. (Year, Month Day). Title. *Website Name*. https://url
+[Accessed: YYYY-MM-DD]
+```
+
+### Standards
+
+```
+Organization. (Year). *Standard Title* (Standard No. XXX). Publisher.
+```
+
+## How to Add References {#adding}
+
+1. **Identify Category**: Determine which category best fits the reference
+2. **Create Entry**: Add reference file in appropriate subdirectory
+3. **Update Index**: Add entry to relevant section in this index
+4. **Link from Principles**: Reference from relevant principle/rule documents
+5. **Include Citation**: Follow appropriate citation format
+
+## Reference Linking {#linking}
+
+### In QMD Documents
+
+Reference sources using standard academic format in `related_to` metadata:
+
+```yaml
+---
+title: "Principle Title"
+related_to:
+  - "Smith et al. (2020) - Database Design Patterns"
+  - "ISO/IEC 25010 - Software Quality Model"
+references:
+  - "academic/smith_2020_database_patterns.pdf"
+  - "standards/iso_25010_quality_model.pdf"
+---
+```
+
+### In Markdown Text
+
+Use standard footnote format:
+
+```markdown
+This principle follows established patterns for modular design[^1].
+
+[^1]: Martin, R. C. (2017). *Clean Architecture*. Prentice Hall.
+```
+
+## Directory Structure {#structure}
+
+```
+REFERENCES/
+├── index.qmd                      # This overview
+├── academic/                      # Research papers
+│   ├── software_engineering/
+│   ├── data_management/
+│   ├── ui_design/
+│   └── statistical_methods/
+├── standards/                     # Official standards
+│   ├── iso/
+│   ├── ieee/
+│   ├── w3c/
+│   └── language_specs/
+├── books/                         # Complete texts
+│   ├── software_engineering/
+│   ├── database_design/
+│   ├── statistical_computing/
+│   └── programming_languages/
+├── legal_regulatory/              # Legal documents
+│   └── 中華民國憲法.rtf
+├── online_resources/              # Web documentation
+│   ├── framework_docs/
+│   ├── tutorials/
+│   └── community_guides/
+├── frameworks/                    # Specific tech docs
+│   ├── shiny/
+│   ├── r_packages/
+│   ├── databases/
+│   └── ui_frameworks/
+└── industry_practices/            # Best practices
+    ├── architecture_patterns/
+    ├── design_patterns/
+    ├── methodologies/
+    └── standards/
+```
+
+## Quality Standards {#quality}
+
+### Reference Selection Criteria
+
+1. **Authority**: Source must be authoritative and credible
+2. **Relevance**: Must directly inform principle development
+3. **Currency**: Prefer recent sources unless historical context needed
+4. **Accessibility**: Should be accessible to development team
+
+### Documentation Requirements
+
+1. **Complete Citation**: Full bibliographic information
+2. **Access Information**: How to obtain the reference
+3. **Relevance Note**: Brief note on how it informs principles
+4. **Key Concepts**: Summary of main ideas used
+
+## Current Statistics {#stats}
+
+- **Total References**: 1
+- **Legal/Regulatory**: 1
+- **Academic**: 0
+- **Standards**: 0
+- **Books**: 0
+- **Online Resources**: 0
+- **Frameworks**: 0
+- **Industry Practices**: 0
+- **Last Updated**: 2025-08-23
+
+## Maintenance {#maintenance}
+
+### Regular Reviews
+
+- **Quarterly**: Review currency of online resources
+- **Annually**: Update standards and specifications
+- **As Needed**: Add new references when principles evolve
+
+### Link Checking
+
+All online references should be checked periodically for availability and updated URLs.
+
+---
+
+*This reference system ensures proper attribution and provides a knowledge foundation for principle development and architectural decisions.*

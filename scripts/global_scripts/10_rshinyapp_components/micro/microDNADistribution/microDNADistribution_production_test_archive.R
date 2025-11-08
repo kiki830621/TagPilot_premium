@@ -55,15 +55,15 @@ ui <- bs4Dash::bs4DashPage(
   bs4Dash::bs4DashNavbar(title = "DNA Distribution"),
   bs4Dash::bs4DashSidebar(
     bs4Dash::bs4SidebarMenu(
-      bs4Dash::bs4SidebarMenuproduct(
+      bs4Dash::bs4SidebarMenuItem(
         text = "DNA Distribution",
         tabName = "dna_distribution"
       )
     )
   ),
   bs4Dash::bs4DashBody(
-    bs4Dash::bs4Tabproducts(
-      bs4Dash::bs4Tabproduct(
+    bs4Dash::bs4TabItems(
+      bs4Dash::bs4TabItem(
         tabName = "dna_distribution",
         microDNADistribution("dna_distribution")$ui()
       )

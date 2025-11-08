@@ -1,0 +1,153 @@
+---
+title: "MAMBA 系統改版記錄"
+author: "MAMBA Development Team"
+date: "2025-08-04"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-title: "目錄"
+    number-sections: true
+    theme: cosmo
+---
+
+# 改版記錄總覽
+
+本文檔記錄 MAMBA 儀表板系統的重要改版歷史，包含功能新增、修正與優化。
+
+## 版本命名規則
+
+- **主版本號 (X.0.0)**: 重大架構變更
+- **次版本號 (0.X.0)**: 新功能或重要改進
+- **修訂號 (0.0.X)**: 錯誤修復或小調整
+
+---
+
+# Version 1.2.0 - 2025-08-04
+
+## 🎯 重點摘要
+
+本次改版著重於 AI 功能整合、資料處理優化，以及平台相容性提升。
+
+## ✨ 新增功能
+
+### AI 新產品開發建議
+- **位置**: 精準行銷模組 (`poissonFeatureAnalysis.R`)
+- **功能**: 基於正向屬性係數自動生成產品開發建議
+- **模型**: 支援 o3 深度分析模型
+
+### OpenAI Prompts 集中管理
+- **檔案**: `list_openai_prompt.yaml`
+- **內容**: 
+  - 7 大類系統提示
+  - 13 個模組專用提示
+  - 模型選擇策略指南
+
+## 🔧 重要變更
+
+### 資料欄位統一
+```r
+# 舊版
+item_id
+
+# 新版
+product_id
+```
+影響組件：
+- positionIdealRate
+- positionTable
+- positionKFE
+- positionStrategy
+- positionMSPlotly
+
+### 平台 ID 格式現代化
+```r
+# 舊版 (數字)
+platform_id == "1"  # eBay
+platform_id == "2"  # Amazon
+
+# 新版 (字符串)
+platform_id == "eby"
+platform_id == "amz"
+```
+
+### 檔案命名標準化
+- `poissonFeatureAnalysisInsightForge.R` → `poissonFeatureAnalysis.R`
+- 統一使用標準命名，避免版本混淆
+
+## 🐛 錯誤修復
+
+### Poisson 組件變數篩選
+- **問題**: `eby_item_id`、`url_*`、`*_is_missing` 等不適當變數未被過濾
+- **解決**: 實作 `filter_covariates()` 函數，支援 YAML 配置排除規則
+
+### 市場賽道分析顯示邏輯
+- **問題**: 負數倍率造成解讀困擾
+- **解決**: 過濾只顯示正向影響因素 (IRR > 1)
+
+### OpenAI 模型相容性
+- **問題**: o3 模型不支援 temperature 參數
+- **解決**: 根據模型類型動態調整參數：
+  ```r
+  if (grepl("^o3", model)) {
+    body$max_completion_tokens <- 4000
+  }
+  ```
+
+## ⚡ 效能優化
+
+### microMacroKPI DuckDB 優化
+- **改進**: SQL 層聚合計算，避免載入原始資料
+- **效果**: 
+  - 記憶體使用降低 95%+
+  - 支援更大資料集
+  - 計算速度提升
+
+```r
+# 優化後：直接在 DuckDB 計算
+kpi_summary <- tbl %>%
+  summarise(
+    m_value_mean = mean(m_value, na.rm = TRUE),
+    m_value_sum = sum(m_value, na.rm = TRUE),
+    # ... 其他統計
+  ) %>%
+  collect()  # 只傳回 1 列結果
+```
+
+## 🚫 移除項目
+
+### 顯示數量限制
+- 關鍵因素分析：原本限制 8 個 → 現在顯示全部
+- 理想點分析：原本限制 8 個 → 現在顯示全部
+
+---
+
+# Version 1.1.0 - 2025-07-15
+
+## 架構優化
+- 實施 Connected Component Principle (MP56)
+- 統一使用 tbl2() 進行資料存取 (R116)
+
+---
+
+# 待辦事項追蹤
+
+## 高優先級
+- [ ] 新增個別產品篩選功能（問題 9、21）
+- [ ] 統一所有組件的平台篩選邏輯（問題 27）
+
+## 中優先級
+- [ ] 修正 CSA 分析的 NA 問題
+- [ ] 移除名目變數：wastegate_type、cooling_system_type、fuel_type
+
+## 低優先級
+- [ ] UI 介面整合（問題 2、3）
+- [ ] 匯出功能完善（問題 25）
+
+---
+
+# 相關文件
+
+- [儀表板問題整理](../../../../../../docs/suggestion/曼巴儀表板問題_20250802b_整理版.md)
+- [系統原則文檔](../README.md)
+- [CLAUDE.md 開發指南](../../../../../../../CLAUDE.md)

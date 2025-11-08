@@ -168,7 +168,7 @@ ui <- bs4Dash::bs4DashPage(
       bs4Dash::bs4DropdownMenu(
         type = "notifications",
         badgeStatus = "success",
-        bs4Dash::notificationproduct(
+        bs4Dash::notificationItem(
           text = "Welcome to Precision Marketing",
           icon = shiny::icon("info"),
           status = "primary"
@@ -187,7 +187,7 @@ ui <- bs4Dash::bs4DashPage(
     bs4Dash::sidebarMenu(
       id = "sidebar_menu",
       bs4Dash::bs4SidebarHeader("Application Settings"),
-      bs4Dash::bs4SidebarMenuproduct(
+      bs4Dash::bs4SidebarMenuItem(
         text = "Customer DNA",
         tabName = "microCustomer",
         icon = icon("users")
@@ -202,9 +202,9 @@ ui <- bs4Dash::bs4DashPage(
     css_dependencies, # Include the CSS dependencies
     shinyjs::useShinyjs(), # Enable shinyjs for UI interactions
     
-    bs4Dash::bs4Tabproducts(
+    bs4Dash::bs4TabItems(
       # Dashboard tab
-      bs4Dash::bs4Tabproduct(
+      bs4Dash::bs4TabItem(
         tabName = "dashboard",
         shiny::fluidRow(
           bs4Dash::valueBox(
@@ -241,7 +241,7 @@ ui <- bs4Dash::bs4DashPage(
       ),
       
       # Customer Analysis tab
-      bs4Dash::bs4Tabproduct(
+      bs4Dash::bs4TabItem(
         tabName = "microCustomer",
         shiny::fluidRow(
           shiny::column(
@@ -259,7 +259,7 @@ ui <- bs4Dash::bs4DashPage(
       ),
       
       # DNA Analysis tab
-      bs4Dash::bs4Tabproduct(
+      bs4Dash::bs4TabItem(
         tabName = "dna",
         shiny::fluidRow(
           shiny::column(
@@ -276,7 +276,7 @@ ui <- bs4Dash::bs4DashPage(
       ),
       
       # Settings tab
-      bs4Dash::bs4Tabproduct(
+      bs4Dash::bs4TabItem(
         tabName = "settings",
         bs4Dash::bs4Card(
           title = "Application Settings",
@@ -334,7 +334,7 @@ ui <- bs4Dash::bs4DashPage(
     bs4Dash::controlbarMenu(
       id = "controlbarMenu",
       type = "pills",
-      bs4Dash::controlbarproduct(
+      bs4Dash::controlbarItem(
         title = "Info",
         icon = shiny::icon("info-circle"),
         bs4Dash::bs4Card(
@@ -343,7 +343,7 @@ ui <- bs4Dash::bs4DashPage(
           width = 12
         )
       ),
-      bs4Dash::controlbarproduct(
+      bs4Dash::controlbarItem(
         title = "Settings",
         icon = shiny::icon("sliders-h"),
         shiny::selectInput(
@@ -360,7 +360,7 @@ ui <- bs4Dash::bs4DashPage(
       )
     ),
     
-    # Footer product for help
+    # Footer item for help
     footer = shiny::actionButton(
       "help", 
       "Get Help", 

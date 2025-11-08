@@ -28,38 +28,19 @@ Sys.setenv(R_INSTALL_STAGED = FALSE)
 options(warn = 1)  # Show warnings immediately but don't stop
 
 # MP47: Functional Programming - Safe project root detection for deployment
-find_and_set_project_root <- function(){
-  p <- getwd()
-  
-  # Check if we're already in the right directory (deployment case)
-  if (file.exists(file.path(p, "app.R")) && 
-      dir.exists(file.path(p, "update_scripts", "global_scripts"))) {
-    message("工作目錄已設定為 (deployment): ", p)
-    return(TRUE)
-  }
-  
-  # Original logic for local development
-  while(!endsWith(p,"precision_marketing_app") && !file.exists(file.path(p,"precision_marketing_app"))){
-    nxt <- dirname(p)
-    if(nxt==p){ 
-      warning("找不到 precision_marketing_app 目錄，使用當前目錄")
-      return(TRUE)  # Continue with current directory in deployment
-    }
-    p <- nxt 
-  }
-  
-  if(!endsWith(p,"precision_marketing_app")) p <- file.path(p,"precision_marketing_app")
-  if(dir.exists(p)){ 
-    setwd(p)
-    message("工作目錄已設定為: ", p)
-    return(TRUE)
-  } else {
-    warning("無法設定專案根目錄，使用當前目錄")
-    return(TRUE)
-  }
+# R03: Error Handling - Ensure here package is available
+if (!requireNamespace("here", quietly = TRUE)) {
+  warning("here package not installed, using current directory")
+} else {
+  tryCatch({
+    setwd(here::here())
+    message("Working directory set to: ", getwd())
+  }, error = function(e) {
+    warning("Failed to set working directory with here: ", e$message)
+  })
 }
 
-find_and_set_project_root()
+
 autoinit()
 
 # R68: Object Initialization - Ensure required variables exist
@@ -67,75 +48,68 @@ if (!exists("PACKAGES_INITIALIZED")) {
   PACKAGES_INITIALIZED <- list(status = "minimal")
 }
 
-# ---- 1. 套件 --------------------------------------------------------------
-library(shiny); library(bs4Dash); library(plotly); library(dplyr); library(shinyjs); library(DBI); library(DT); library(tidyr); library(MASS); library(stringr); library(httr2); library(jsonlite); library(later)
+# Load password-only login module
+source("scripts/global_scripts/10_rshinyapp_components/passwordOnly/passwordOnlyUI.R")
+source("scripts/global_scripts/10_rshinyapp_components/passwordOnly/passwordOnlyServer.R")
+
+# Load report integration module - Following R09: UI-Server-Defaults triple
+# MP56: Connected Component Principle - Enable cross-module data sharing
+source("scripts/global_scripts/10_rshinyapp_components/report/reportIntegration/reportIntegration.R")
+
 
 # ---- 2. 連線 --------------------------------------------------------------
-# Connect to the app database using the Enhanced Data Access approach (R116)
-connect_to_app_database <- function(db_path = "app_data/app_data.duckdb") {
-  tryCatch({
-    # Check if file exists
-    if (!file.exists(db_path)) {
-      stop("Database file does not exist at path: ", db_path)
-    }
-    
-    # 1. 關閉所有先前的連線（如果有）
-    #    並且釋放掉該 driver instance  
-    if (exists("conn")) {
-      DBI::dbDisconnect(conn, shutdown = TRUE)
-    }
-    
-    # 2. 建立一個新的 DuckDB driver，並在這裡指定 dbdir 與 read_only = TRUE
-    drv_ro <- duckdb::duckdb(
-      dbdir     = db_path,     # 你的 .duckdb 檔案路徑
-      read_only = TRUE         # 唯讀模式
-    )
-    
-    # 3. 用這個唯讀 driver 建立連線
-    conn_ro <- DBI::dbConnect(drv_ro)
-    
-    # 4. 驗證
-    conn_ro
-    # 應該會看到類似：
-    # <duckdb_connection ... read_only=TRUE ...>
-    
-    return(conn_ro)
-  }, error = function(e) {
-    message("Error connecting to database: ", e$message)
-    return(NULL)
-  })
-}
+# Database connection will be established inside server function to avoid lifecycle issues
 
-app_connection <- connect_to_app_database()
 
 # ---- 3. Component 載入 ----------------------------------------------------
 # 確保載入 position 相關元件
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "position", "positionTable", "positionTable.R"))
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "position", "positionDNAPlotly", "positionDNAPlotly.R"))
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "position", "positionMSPlotly", "positionMSPlotly.R"))
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "position", "positionKFE", "positionKFE.R"))
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "position", "positionIdealRate", "positionIdealRate.R"))
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "position", "positionStrategy", "positionStrategy.R"))
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "micro", "microMacroKPI", "microMacroKPI.R"))
+# 這些都會initialize不需要額外載入
+# 翻譯函數 - 設為全域以確保所有模組都能存取
+translate <<- function(x) x   # 佔位翻譯函數
 
-# 載入 Poisson 分析相關元件
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "poisson", "poissonTimeAnalysis", "poissonTimeAnalysis.R"))
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "poisson", "poissonFeatureAnalysis", "poissonFeatureAnalysis.R"))
-source(file.path("update_scripts", "global_scripts", "10_rshinyapp_components", "poisson", "poissonCommentAnalysis", "poissonCommentAnalysis.R"))
+# ---- 3.5 Resource Path Setup (重要：必須在 UI 定義前) ---------------------
+# MP119: UI Block Separation Principle - External CSS file organization
+# R03: Error Handling - Robust path detection for deployment environments
+# MP47: Functional Programming - Safe project root detection
 
-# 翻譯函數
-translate <- function(x) x   # 佔位翻譯函數
+# Set up resource paths for static assets
+if (dir.exists("scripts/global_scripts/24_assets")) {
+  addResourcePath("assets", "scripts/global_scripts/24_assets")
+}
+if (dir.exists("www")) {
+  addResourcePath("www", "www")
+}
+
+# Add resource path for CSS files (following MP119 and UI_R014)
+# CSS files are centralized in 19_CSS directory
+css_path <- "scripts/global_scripts/19_CSS"
+if (dir.exists(css_path)) {
+  addResourcePath("css", css_path)
+  message("Resource path 'css' added for: ", css_path)
+} else {
+  warning("CSS directory not found at: ", css_path)
+}
 
 # ---- 4. CSS ---------------------------------------------------------------
-css_deps <- tags$head(tags$style(HTML(
-  ".sidebar .selectize-dropdown{width:auto!important;min-width:100%!important}.sidebar .selectize-dropdown-content{min-width:100%}
-  /* 確保 DataTables 的滾動條始終顯示 */
-  .dataTables_scrollBody { overflow-x: scroll !important; }
-  /* macOS 滾動條始終顯示的全域設定 */
-  .dataTables_scrollBody::-webkit-scrollbar { -webkit-appearance: none; }
-  .dataTables_scrollBody::-webkit-scrollbar:horizontal { height: 10px; }
-  .dataTables_scrollBody::-webkit-scrollbar-thumb { border-radius: 5px; background-color: rgba(0,0,0,.3); }
-  .dataTables_scrollBody::-webkit-scrollbar-track { background-color: rgba(0,0,0,.1); border-radius: 5px; }
+# MP119: UI Block Separation Principle - External CSS file organization by block type
+# The styles.css file organizes styles by block type (Control, Display, Navigation, etc.)
+css_deps <- tags$head(
+  # Include external CSS files from centralized 19_CSS directory (UI_R014)
+  # union_block_separation.css removed - conflicts with bs4Dash native styles
+  # tags$link(rel = "stylesheet", type = "text/css", href = "css/union_block_separation.css"),
+  tags$link(rel = "stylesheet", type = "text/css", href = "css/union_component_visibility.css"),
+  tags$link(rel = "stylesheet", type = "text/css", href = "css/dynamic_filter_theme.css"),
+  
+  # Keep inline only the critical DataTables-specific styles
+  tags$style(HTML(
+    ".sidebar .selectize-dropdown{width:auto!important;min-width:100%!important}.sidebar .selectize-dropdown-content{min-width:100%}
+    /* 確保 DataTables 的滾動條始終顯示 */
+    .dataTables_scrollBody { overflow-x: scroll !important; }
+    /* macOS 滾動條始終顯示的全域設定 */
+    .dataTables_scrollBody::-webkit-scrollbar { -webkit-appearance: none; }
+    .dataTables_scrollBody::-webkit-scrollbar:horizontal { height: 10px; }
+    .dataTables_scrollBody::-webkit-scrollbar-thumb { border-radius: 5px; background-color: rgba(0,0,0,.3); }
+    .dataTables_scrollBody::-webkit-scrollbar-track { background-color: rgba(0,0,0,.1); border-radius: 5px; }
   /* 確保 filter panel 中的按鈕有適當的左右邊距 */
   .well .btn-block { margin-left: 0 !important; margin-right: 0 !important; width: 100% !important; }
   .wellPanel .btn-block { margin-left: 0 !important; margin-right: 0 !important; width: 100% !important; }
@@ -144,7 +118,7 @@ css_deps <- tags$head(tags$style(HTML(
   .sidebar-section .accordion .card { 
     border: none; 
     background-color: transparent;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;  /* Remove spacing between accordion items */
   }
   .sidebar-section .accordion .card-header { 
     padding: 0.5rem 1rem;
@@ -186,7 +160,7 @@ css_deps <- tags$head(tags$style(HTML(
     padding: 0;
     display: flex;
     justify-content: space-between;
-    align-products: center;
+    align-items: center;
   }
   .sidebar-section .accordion .btn-link:hover { 
     color: #fff !important; 
@@ -199,7 +173,7 @@ css_deps <- tags$head(tags$style(HTML(
     transition: transform 0.2s;
   }
   .sidebar-section .accordion .card-body { 
-    padding: 0.75rem 0.75rem 0.4rem 0.75rem;  /* 減小底部 padding */
+    padding: 0.25rem 0.75rem;  /* 大幅減少上下 padding */
     background-color: transparent;
   }
   /* Platform & Product line (info) card body */
@@ -214,25 +188,43 @@ css_deps <- tags$head(tags$style(HTML(
     border-right: 1px solid var(--primary);
     border-bottom: 1px solid var(--primary);
   }
-  /* 調整 radioButtons 選項間距 */
+  /* 調整 radioButtons 選項間距 - 讓選項更緊密 */
   .sidebar-section .radio { 
-    margin-top: 0.05rem; 
-    margin-bottom: 0.05rem; 
+    margin: 0 !important; 
+    padding: 0 !important;  /* 完全移除間距 */
+    line-height: 1.2;  /* 調整行高讓選項更緊密 */
   }
   .sidebar-section .shiny-options-group { 
-    margin-top: 0; 
-    margin-bottom: 0; 
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* 確保 radioButtons 容器本身也沒有額外間距 */
+  #sidebar_accordion .shiny-input-radiogroup {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .sidebar-section .shiny-options-group .radio:first-child {
+    padding-top: 0;  /* 第一個選項無上方間距 */
   }
   .sidebar-section .shiny-options-group .radio:last-child {
-    margin-bottom: 0;  /* 最後一個選項去除底部間距 */
+    margin-bottom: 0;
+    padding-bottom: 0;  /* 最後一個選項無下方間距 */
   }
   .sidebar-section .shiny-options-group .radio {
-    margin-bottom: 0.05rem;  /* 進一步減小 radioButtons 選項間距 */
+    margin: 0 !important;  /* 強制移除所有 margin */
+    padding: 0 !important;  /* 強制移除所有 padding */
+  }
+  /* 特別針對 accordion 內的 radio buttons */
+  #sidebar_accordion .radio {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.4;  /* 稍微增加一點行高保持可讀性 */
   }"
 )))
 
 # ---- 5. UI ---------------------------------------------------------------
-ui <- bs4DashPage(
+# Main app UI (will be shown after login)
+main_app_ui <- bs4DashPage(
   title = translate("AI Marketing Platform"), fullscreen = TRUE,
   header = bs4DashNavbar(title = bs4DashBrand(translate("AI Marketing Platform")), skin="light", status="primary"),
   sidebar = bs4DashSidebar(status="primary", width="300px", elevation = 3,minified  = FALSE,
@@ -240,7 +232,7 @@ ui <- bs4DashPage(
                            div(class="sidebar-section p-3 mt-2",
                                bs4Accordion(
                                  id = "sidebar_accordion",
-                                 bs4Accordionproduct(
+                                 bs4AccordionItem(
                                    title = "Platform",
                                    status = "info",  # 使用info色（淺藍色）更顯眼
                                    collapsed = TRUE,  # 預設收起
@@ -254,7 +246,7 @@ ui <- bs4DashPage(
                                      selected = "eby"  # 改為選擇 eBay 平台
                                    )
                                  ),
-                                 bs4Accordionproduct(
+                                 bs4AccordionItem(
                                    title = "Product line",
                                    status = "info",  # 使用info色（淺藍色）與Platform統一
                                    collapsed = TRUE,  # 預設收起
@@ -268,69 +260,161 @@ ui <- bs4DashPage(
                                    )
                                  )
                                )),
+                           # Horizontal separator line between platform selector and menu
+                           tags$hr(style = "border: none; border-top: 3px solid #007bff; margin: 15px -15px;"),
                            sidebarMenu(id="sidebar_menu",
-                                       bs4SidebarHeader("Precision Marketing Suite"),
                                        # 1. Marketing Vital-Signs - 宏觀、顧客DNA分佈
-                                       bs4SidebarMenuproduct(
+                                       bs4SidebarMenuItem(
                                          text = "Marketing Vital-Signs",
                                          icon = icon("chart-line"),
                                          startExpanded = TRUE,
-                                         bs4SidebarMenuproduct("宏觀指標監控", tabName="microMacroKPI", icon=icon("tachometer-alt")),
-                                         bs4SidebarMenuproduct("顧客DNA分佈", tabName="dna", icon=icon("chart-bar"))
+                                         bs4SidebarMenuItem("宏觀指標監控", tabName="microMacroKPI", icon=icon("tachometer-alt")),
+                                         bs4SidebarMenuItem("顧客DNA分佈", tabName="dna", icon=icon("chart-bar"))
                                        ),
                                        # 2. TagPilot - 基礎顧客分析
-                                       bs4SidebarMenuproduct(
+                                       bs4SidebarMenuItem(
                                          text = "TagPilot",
                                          icon = icon("tag"),
                                          startExpanded = FALSE,
-                                         bs4SidebarMenuproduct("顧客DNA", tabName="microCustomer", icon=icon("users"))
+                                         bs4SidebarMenuItem("顧客DNA", tabName="microCustomer", icon=icon("users"))
                                        ),
                                        # 3. BrandEdge - 品牌競爭分析
-                                       bs4SidebarMenuproduct(
+                                       bs4SidebarMenuItem(
                                          text = "BrandEdge",
                                          icon = icon("gem"),
                                          startExpanded = FALSE,
-                                         bs4SidebarMenuproduct("品牌屬性評價", tabName="position", icon=icon("table")),
-                                         bs4SidebarMenuproduct("品牌DNA", tabName="positionDNA", icon=icon("chart-line")),
-                                         bs4SidebarMenuproduct("關鍵因素分析", tabName="positionKFE", icon=icon("key")),
-                                         bs4SidebarMenuproduct("理想點分析", tabName="positionIdealRate", icon=icon("star")),
-                                         bs4SidebarMenuproduct("產品屬性重要性分析", tabName="positionMS", icon=icon("crosshairs")),
-                                         bs4SidebarMenuproduct("品牌定位策略建議", tabName="positionStrategy", icon=icon("compass"))
+                                         bs4SidebarMenuItem("品牌屬性評價", tabName="position", icon=icon("table")),
+                                         bs4SidebarMenuItem("品牌DNA", tabName="positionDNA", icon=icon("chart-line")),
+                                        bs4SidebarMenuItem("市場區隔與目標市場分析", tabName="positionMS", icon=icon("crosshairs")),
+                                         bs4SidebarMenuItem("關鍵因素分析", tabName="positionKFE", icon=icon("key")),
+                                         bs4SidebarMenuItem("理想點分析", tabName="positionIdealRate", icon=icon("star")),
+                                         bs4SidebarMenuItem("品牌定位策略建議", tabName="positionStrategy", icon=icon("compass"))
                                        ),
                                        # 4. InsightForge 360 - 高級分析與預測
-                                       bs4SidebarMenuproduct(
+                                       bs4SidebarMenuItem(
                                          text = "InsightForge 360",
                                          icon = icon("lightbulb"),
                                          startExpanded = FALSE,
-                                         bs4SidebarMenuproduct("市場賽道", tabName="poissonComment", icon=icon("trophy")),
-                                         bs4SidebarMenuproduct("投放廣告時間建議", tabName="poissonTime", icon=icon("clock")),
-                                         bs4SidebarMenuproduct("個人化產品廣告輸出", tabName="poissonFeature", icon=icon("bullseye"))
+                                         bs4SidebarMenuItem("市場賽道", tabName="poissonComment", icon=icon("trophy")),
+                                         bs4SidebarMenuItem("時間分析", tabName="poissonTime", icon=icon("clock")),
+                                         bs4SidebarMenuItem("精準行銷", tabName="poissonFeature", icon=icon("bullseye"))
+                                       ),
+                                       # 5. Report Center - 報告生成中心 (MP88: Immediate Feedback)
+                                       bs4SidebarMenuItem(
+                                         text = "Report Center",
+                                         icon = icon("file-alt"),
+                                         tabName = "reportCenter"
                                        ) ),
                            # 動態 filter 容器
                            uiOutput("dynamic_filter") ),
   
-  body = bs4DashBody(css_deps, useShinyjs(),
-                     bs4Tabproducts(
-                       bs4Tabproduct(tabName="microCustomer", fluidRow(column(12, bs4Card(title="Customer DNA Analysis", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("cust_display"))))),
-                       bs4Tabproduct(tabName="microMacroKPI", fluidRow(column(12, bs4Card(title="Key Performance Indicators", status="info", width=12, solidHeader=TRUE, elevation=3, uiOutput("micro_macro_kpi_display"))))),
-                       bs4Tabproduct(tabName="dna",          fluidRow(column(12, bs4Card(title="DNA Distribution",     status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("dna_display"))))),
-                       bs4Tabproduct(tabName="position",      fluidRow(column(12, bs4Card(title="Position Analysis",    status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_display"))))),
-                       bs4Tabproduct(tabName="positionDNA",   fluidRow(column(12, bs4Card(title="Position DNA Visualization", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_dna_display"))))),
-                       bs4Tabproduct(tabName="positionMS",    fluidRow(
-                         column(12, bs4Card(title="Market Segmentation Analysis", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_ms_display")))
+  body = bs4DashBody(css_deps,
+                     bs4TabItems(
+                       bs4TabItem(tabName="microCustomer", fluidRow(column(12, bs4Card(title="Customer DNA Analysis", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("cust_display"))))),
+                       bs4TabItem(tabName="microMacroKPI", fluidRow(column(12, bs4Card(title="Key Performance Indicators", status="info", width=12, solidHeader=TRUE, elevation=3, uiOutput("micro_macro_kpi_display"))))),
+                       bs4TabItem(tabName="dna",          fluidRow(column(12, bs4Card(title="DNA Distribution",     status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("dna_display"))))),
+                       bs4TabItem(tabName="position",      fluidRow(column(12, bs4Card(title="Position Analysis",    status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_display"))))),
+                       bs4TabItem(tabName="positionDNA",   fluidRow(column(12, bs4Card(title="Position DNA Visualization", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_dna_display"))))),
+                       bs4TabItem(tabName="positionMS",    fluidRow(
+                         column(12, bs4Card(title="市場區隔與目標市場分析", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_ms_display")))
                        )),
-                       bs4Tabproduct(tabName="positionKFE",   fluidRow(column(12, bs4Card(title="Key Factor Analysis", status="success", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_kfe_full_display"))))),
-                       bs4Tabproduct(tabName="positionIdealRate", fluidRow(column(12, bs4Card(title="Ideal Rate Analysis", status="warning", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_ideal_rate_display"))))),
-                       bs4Tabproduct(tabName="positionStrategy", fluidRow(column(12, bs4Card(title="Strategic Position Analysis", status="danger", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_strategy_display"))))),
-                       bs4Tabproduct(tabName="poissonTime", fluidRow(column(12, bs4Card(title="時間區段分析", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("poisson_time_display"))))),
-                       bs4Tabproduct(tabName="poissonFeature", fluidRow(column(12, bs4Card(title="精準模型分析", status="success", width=12, solidHeader=TRUE, elevation=3, uiOutput("poisson_feature_display"))))),
-                       bs4Tabproduct(tabName="poissonComment", fluidRow(column(12, bs4Card(title="產品賽道分析", status="info", width=12, solidHeader=TRUE, elevation=3, uiOutput("poisson_comment_display"))))) ) ),
+                       bs4TabItem(tabName="positionKFE",   fluidRow(column(12, bs4Card(title="Key Factor Analysis", status="success", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_kfe_full_display"))))),
+                       bs4TabItem(tabName="positionIdealRate", fluidRow(column(12, bs4Card(title="Ideal Rate Analysis", status="warning", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_ideal_rate_display"))))),
+                       bs4TabItem(tabName="positionStrategy", fluidRow(column(12, bs4Card(title="Strategic Position Analysis", status="danger", width=12, solidHeader=TRUE, elevation=3, uiOutput("position_strategy_display"))))),
+                       bs4TabItem(tabName="poissonTime", fluidRow(column(12, bs4Card(title="時間區段分析", status="primary", width=12, solidHeader=TRUE, elevation=3, uiOutput("poisson_time_display"))))),
+                       bs4TabItem(tabName="poissonFeature", fluidRow(column(12, bs4Card(title="精準模型分析", status="success", width=12, solidHeader=TRUE, elevation=3, uiOutput("poisson_feature_display"))))),
+                       bs4TabItem(tabName="poissonComment", fluidRow(column(12, bs4Card(title="產品賽道分析", status="info", width=12, solidHeader=TRUE, elevation=3, uiOutput("poisson_comment_display"))))),
+                       # Report Center tab - Following MP88: Immediate Feedback
+                       bs4TabItem(tabName="reportCenter", fluidRow(column(12, bs4Card(title="Report Generation Center", status="danger", width=12, solidHeader=TRUE, elevation=3, uiOutput("report_display"))))) ) ),
   
   footer = dashboardFooter(fixed=TRUE, right="Version 1.0.0 | 2025") )
 
+# ---- 5.5 Complete UI with Login --------------------------------------------
+ui <- tagList(
+  useShinyjs(),
+  css_deps,
+  
+  # Password login interface
+  div(id = "login_page",
+    passwordOnlyUI(
+      id = "auth",
+      app_title = translate("AI Marketing Platform"),
+      app_icon = "assets/icons/app_icon.png",  # Optional: add your icon
+      password_label = "請輸入系統密碼",
+      submit_label = "進入系統",
+      primary_color = "#007bff"
+    )
+  ),
+  
+  # Main application interface
+  hidden(
+    div(id = "main_app",
+      main_app_ui
+    )
+  )
+)
+
 # ---- 6. Server -----------------------------------------------------------
 server <- function(input, output, session){
-  # ---- 6.1 共享設定 ------------------------------------------------------
+  # ---- 6.0 登入驗證 ------------------------------------------------------
+  # Initialize password authentication
+  auth <- passwordOnlyServer(
+    id = "auth",
+    password_env_var = "APP_PASSWORD",  # Set this in your deployment environment
+    max_attempts = 3,
+    lockout_duration = 300  # 5 minutes
+  )
+
+  # ---- 6.0.1 Initialize Default Tab --------------------------------------
+  # Set default tab on app startup to prevent NULL sidebar_menu errors
+  # This ensures input$sidebar_menu always has a valid value
+  # ENHANCED: Use isolate and once flag to prevent race conditions
+  # Principle: MP031/MP033 - Proper initialization patterns
+  observe({
+    if (is.null(input$sidebar_menu) || length(input$sidebar_menu) == 0) {
+      isolate({
+        # Use isolate to prevent reactive loops during initialization
+        updateTabItems(session, "sidebar_menu", selected = "microMacroKPI")
+      })
+    }
+  }) |> bindEvent(TRUE, once = TRUE)  # Execute only once at startup
+
+  # Monitor login status
+  observe({
+    if (auth$logged_in()) {
+      # Hide login and show main app
+      shinyjs::hide("login_page")
+      shinyjs::show("main_app")
+      
+      # Show success notification
+      showNotification(
+        "歡迎使用 AI Marketing Platform",
+        type = "message",
+        duration = 5
+      )
+    }
+  })
+  
+  # ---- 6.1 資料庫連接 ----------------------------------------------------
+  # Connect to the app database using the Enhanced Data Access approach (R116)
+  # Create connection inside server to ensure proper lifecycle management
+  app_connection <- dbConnectDuckdb(db_path_list$app_data, read_only = TRUE)
+  
+  # Create a reactive value to track connection status
+  connection_active <- reactiveVal(TRUE)
+  
+  # Ensure connection is closed when session ends
+  session$onSessionEnded(function(){
+    # Mark connection as inactive first
+    connection_active(FALSE)
+    
+    # Then close the connection
+    if(!is.null(app_connection) && inherits(app_connection, "DBIConnection")) {
+      try(DBI::dbDisconnect(app_connection), silent = TRUE)
+    }
+  })
+  
+  # ---- 6.2 共享設定 ------------------------------------------------------
   comp_config <- reactive({
     list(
       filters    = list(platform_id = input$platform,
@@ -339,7 +423,7 @@ server <- function(input, output, session){
     )
   })
   
-  # ---- 6.2 Component instances -----------------------------------------
+  # ---- 6.3 Component instances -----------------------------------------
   customer_comp <- microCustomerComponent("cust", app_connection, comp_config, translate)
   dna_comp      <- microDNADistributionComponent("dna", app_connection, comp_config, translate)
   position_comp <- positionTableComponent("position", app_connection, comp_config, translate)
@@ -350,28 +434,58 @@ server <- function(input, output, session){
   position_ideal_rate_comp <- positionIdealRateComponent("position_ideal_rate", app_connection, comp_config, translate)
   position_strategy_comp <- positionStrategyComponent("position_strategy", app_connection, comp_config, translate)
   micro_macro_kpi_comp <- microMacroKPIComponent("micro_macro_kpi", app_connection, comp_config, translate)
-  
+
   # Poisson analysis components
   poisson_time_comp <- poissonTimeAnalysisComponent("poisson_time", app_connection, comp_config, translate)
+
+  # 使用 Poisson 特徵分析元件
   poisson_feature_comp <- poissonFeatureAnalysisComponent("poisson_feature", app_connection, comp_config, translate)
+
+  # 使用 Poisson 評論分析元件
   poisson_comment_comp <- poissonCommentAnalysisComponent("poisson_comment", app_connection, comp_config, translate)
+
+  # Report Integration Component - Following MP56: Connected Component Principle
+  # R116: Enhanced Data Access with tbl2
+  report_comp <- reportIntegrationComponent("report", app_connection, comp_config, translate)
   
-  # ---- 6.3 動態 Filter 注入 --------------------------------------------
-  output$dynamic_filter <- renderUI({ switch(input$sidebar_menu,
-                                             "microCustomer" = customer_comp$ui$filter,
-                                             "dna"           = dna_comp$ui$filter,
-                                             "position"      = position_comp$ui$filter,
-                                             "positionDNA"   = position_dna_comp$ui$filter,
-                                             "positionMS"    = position_ms_comp$ui$filter,
-                                             "positionKFE"   = position_kfe_full_comp$ui$filter,
-                                             "positionIdealRate" = position_ideal_rate_comp$ui$filter,
-                                             "positionStrategy" = position_strategy_comp$ui$filter,
-                                             "microMacroKPI" = micro_macro_kpi_comp$ui$filter,
-                                             "poissonTime"   = poisson_time_comp$ui$filter,
-                                             "poissonFeature" = poisson_feature_comp$ui$filter,
-                                             "poissonComment" = poisson_comment_comp$ui$filter, NULL) })
+  # ---- 6.4 動態 Filter 注入 --------------------------------------------
+  # Apply defensive programming: check if sidebar_menu is NULL, empty, or not scalar
+  # FIX: Ensure input$sidebar_menu is scalar (length 1) before using in switch
+  # Principle: MP031/MP033 - Proper initialization patterns
+  # Principle: Defensive Programming - Handle vector inputs gracefully
+  output$dynamic_filter <- renderUI({
+    # Defensive check: Return NULL if sidebar_menu is not yet initialized
+    if (is.null(input$sidebar_menu) || length(input$sidebar_menu) == 0) {
+      return(NULL)
+    }
+
+    # CRITICAL FIX: Ensure scalar input for switch statement
+    # If input contains multiple values, take the first one
+    sidebar_value <- if(length(input$sidebar_menu) > 1) {
+      warning("sidebar_menu contains multiple values, using first: ", paste(input$sidebar_menu, collapse=", "))
+      input$sidebar_menu[1]
+    } else {
+      input$sidebar_menu
+    }
+
+    switch(sidebar_value,
+           "microCustomer" = customer_comp$ui$filter,
+           "dna"           = dna_comp$ui$filter,
+           "position"      = position_comp$ui$filter,
+           "positionDNA"   = position_dna_comp$ui$filter,
+           "positionMS"    = position_ms_comp$ui$filter,
+           "positionKFE"   = position_kfe_full_comp$ui$filter,
+           "positionIdealRate" = position_ideal_rate_comp$ui$filter,
+           "positionStrategy" = position_strategy_comp$ui$filter,
+           "microMacroKPI" = micro_macro_kpi_comp$ui$filter,
+           "poissonTime"   = poisson_time_comp$ui$filter,
+           "poissonFeature" = poisson_feature_comp$ui$filter,
+           "poissonComment" = poisson_comment_comp$ui$filter,
+           "reportCenter" = report_comp$ui$filter,
+           NULL)  # Default case when no match
+  })
   
-  # ---- 6.4 Component UI (using renderUI2 for conditional rendering) -------
+  # ---- 6.5 Component UI (using renderUI2 for conditional rendering) -------
   output$cust_display     <- renderUI2(
     current_tab = input$sidebar_menu,
     target_tab = "microCustomer", 
@@ -450,12 +564,20 @@ server <- function(input, output, session){
   
   output$poisson_comment_display <- renderUI2(
     current_tab = input$sidebar_menu,
-    target_tab = "poissonComment", 
+    target_tab = "poissonComment",
     ui_component = poisson_comment_comp$ui$display,
     loading_icon = "trophy"
   )
+
+  # Report Center UI output - Following MP88: Immediate Feedback
+  output$report_display <- renderUI2(
+    current_tab = input$sidebar_menu,
+    target_tab = "reportCenter",
+    ui_component = report_comp$ui$display,
+    loading_icon = "file-alt"
+  )
   
-  # ---- 6.5 啟動 Component server ---------------------------------------
+  # ---- 6.6 啟動 Component server ---------------------------------------
   # Initialize all component servers immediately (for proper reactive behavior)
   cust_res     <- customer_comp$server(input, output, session)
   dna_res      <- dna_comp$server(input, output, session)
@@ -476,11 +598,41 @@ server <- function(input, output, session){
   poisson_time_res <- poisson_time_comp$server(input, output, session)
   poisson_feature_res <- poisson_feature_comp$server(input, output, session)
   poisson_comment_res <- poisson_comment_comp$server(input, output, session)
+
+  # Initialize Report Integration Server - Following MP56: Connected Component Principle
+  # Collect all module results for report generation
+  module_results <- reactive({
+    list(
+      vital_signs = list(
+        micro_macro_kpi = micro_macro_kpi_res,
+        dna_distribution = dna_res
+      ),
+      tagpilot = list(
+        customer_dna = cust_res
+      ),
+      brandedge = list(
+        position_table = position_res,
+        position_dna = position_dna_res,
+        position_ms = position_ms_res,
+        position_kfe = position_kfe_full_res,
+        position_ideal = position_ideal_rate_res,
+        position_strategy = position_strategy_res
+      ),
+      insightforge = list(
+        poisson_comment = poisson_comment_res,
+        poisson_time = poisson_time_res,
+        poisson_feature = poisson_feature_res
+      )
+    )
+  })
+
+  # Pass module results to report component
+  report_res <- report_comp$server(input, output, session, module_results)
   
-  # ---- 6.55  切換分頁時的跨元件協調 ---------------------------
+  # ---- 6.7  切換分頁時的跨元件協調 ---------------------------
   observeEvent(input$sidebar_menu, {
     # 切到 DNA 或 Position 分頁時重置 microCustomer
-    if (input$sidebar_menu %in% c("dna", "position", "positionDNA", "positionMS", "positionKFE", "positionIdealRate", "positionStrategy", "microMacroKPI", "poissonTime", "poissonFeature", "poissonComment")) {
+    if (input$sidebar_menu %in% c("dna", "position", "positionDNA", "positionMS", "positionKFE", "positionIdealRate", "positionStrategy", "microMacroKPI", "poissonTime", "poissonFeature", "poissonComment", "reportCenter")) {
       # 透過自訂訊息「點擊」 cust 模組裡的 clear_filter 按鈕
       session$sendCustomMessage(
         "shiny.button.click",
@@ -502,7 +654,7 @@ server <- function(input, output, session){
     
     # 當切換到 Position MS (Market Segmentation) 分頁時，顯示通知訊息
     if (input$sidebar_menu == "positionMS") {
-      showNotification("Market Segmentation Analysis provides MDS-based positioning insights", 
+      showNotification("市場區隔與目標市場分析：透過 MDS 分析識別關鍵市場區隔",
                        type = "message", duration = 5)
     }
     
@@ -544,12 +696,18 @@ server <- function(input, output, session){
     
     # 當切換到 Poisson 產品賽道分析分頁時，顯示通知訊息
     if (input$sidebar_menu == "poissonComment") {
-      showNotification("產品賽道分析：基於評分和評論的競爭力分析", 
+      showNotification("產品賽道分析：基於評分和評論的競爭力分析",
+                       type = "message", duration = 5)
+    }
+
+    # 當切換到 Report Center 分頁時，顯示通知訊息 - MP88: Immediate Feedback
+    if (input$sidebar_menu == "reportCenter") {
+      showNotification("Report Generation Center: Generate comprehensive analysis reports",
                        type = "message", duration = 5)
     }
   }, ignoreInit = TRUE)
   
-  # ---- 6.6 通用通知 / 狀態 ---------------------------------------------
+  # ---- 6.8 通用通知 / 狀態 ---------------------------------------------
   observeEvent(input$platform, {
     # Use df_platform to get the correct platform name
     platform_id <- as.character(input$platform)
@@ -593,8 +751,6 @@ server <- function(input, output, session){
       # Silently handle any logging errors
     })
   }, ignoreInit = TRUE)
-  
-  session$onSessionEnded(function(){ if(!is.null(app_connection)&&inherits(app_connection,"DBIConnection")) try(DBI::dbDisconnect(app_connection), silent=TRUE) })
 }
 
 # ---- 7. Run --------------------------------------------------------------

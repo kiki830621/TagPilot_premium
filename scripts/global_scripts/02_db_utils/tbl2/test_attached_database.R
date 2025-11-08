@@ -7,7 +7,7 @@ library(duckdb)
 library(dplyr)
 
 # Set working directory and initialize
-setwd("/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l3_enterprise/WISER")
+setwd("/Users/che/Library/CloudStorage/Dropbox/che_workspace/projects/ai_martech/l4_enterprise/WISER")
 
 # Initialize using autoinit system
 needgoogledrive <- TRUE

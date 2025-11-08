@@ -79,10 +79,10 @@ ui <- bs4Dash::dashboardPage(
   sidebar = bs4Dash::dashboardSidebar(
     bs4Dash::sidebarMenu(
       id = "tabs",
-      bs4Dash::menuproduct("Full View", tabName = "full", icon = icon("th")),
-      bs4Dash::menuproduct("RFM Only", tabName = "rfm", icon = icon("chart-pie")),
-      bs4Dash::menuproduct("Value Metrics", tabName = "value", icon = icon("dollar-sign")),
-      bs4Dash::menuproduct("Custom Config", tabName = "custom", icon = icon("cogs"))
+      bs4Dash::menuItem("Full View", tabName = "full", icon = icon("th")),
+      bs4Dash::menuItem("RFM Only", tabName = "rfm", icon = icon("chart-pie")),
+      bs4Dash::menuItem("Value Metrics", tabName = "value", icon = icon("dollar-sign")),
+      bs4Dash::menuItem("Custom Config", tabName = "custom", icon = icon("cogs"))
     )
   ),
   body = bs4Dash::dashboardBody(
@@ -114,9 +114,9 @@ ui <- bs4Dash::dashboardPage(
         }
       "))
     ),
-    bs4Dash::tabproducts(
+    bs4Dash::tabItems(
       # Tab 1: Full component (all fields)
-      bs4Dash::tabproduct(
+      bs4Dash::tabItem(
         tabName = "full",
         fluidRow(
           column(width = 3,
@@ -136,7 +136,7 @@ ui <- bs4Dash::dashboardPage(
       ),
       
       # Tab 2: RFM only view
-      bs4Dash::tabproduct(
+      bs4Dash::tabItem(
         tabName = "rfm",
         fluidRow(
           column(width = 3,
@@ -156,7 +156,7 @@ ui <- bs4Dash::dashboardPage(
       ),
       
       # Tab 3: Value metrics only
-      bs4Dash::tabproduct(
+      bs4Dash::tabItem(
         tabName = "value",
         fluidRow(
           column(width = 3,
@@ -176,7 +176,7 @@ ui <- bs4Dash::dashboardPage(
       ),
       
       # Tab 4: Custom configuration
-      bs4Dash::tabproduct(
+      bs4Dash::tabItem(
         tabName = "custom",
         fluidRow(
           column(width = 3,

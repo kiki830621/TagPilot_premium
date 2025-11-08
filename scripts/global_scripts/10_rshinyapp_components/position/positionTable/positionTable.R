@@ -15,7 +15,7 @@
 #
 # Features:
 #   • Character-based platform IDs (e.g., "amz", "eby", "all")
-#   • Dynamic filtering by platform, product_line, brand, and product ID
+#   • Dynamic filtering by platform, product_line, brand, and Item ID
 #   • Integration with global filters (platform, product_line)
 #   • Tabular data visualization with DT
 # -----------------------------------------------------------------------------
@@ -47,7 +47,24 @@ simple_filter_position_table <- function(data, threshold = 0.3) {
   if (is.null(data) || nrow(data) == 0) {
     return(data)
   }
-  
+
+  # ISSUE_113 Fix: Validate and clean brand field first (MP114 - input validation)
+  if ("brand" %in% colnames(data)) {
+    data <- data %>%
+      dplyr::mutate(
+        # Convert empty strings to NA first
+        brand = dplyr::na_if(brand, ""),
+        # Then handle NA values
+        brand = tidyr::replace_na(brand, "UNKNOWN")
+      )
+
+    # Log validation (MP106 - console output transparency)
+    empty_brand_count <- sum(data$brand == "", na.rm = TRUE)
+    if (empty_brand_count > 0) {
+      message("  ⚠️  Found ", empty_brand_count, " rows with empty brand - converting to 'UNKNOWN'")
+    }
+  }
+
   # 識別必須保留的基本欄位
   essential_cols <- c("product_id", "brand", "product_line_id", "rating", "sales")
   essential_cols <- intersect(essential_cols, colnames(data))
@@ -77,9 +94,23 @@ simple_filter_position_table <- function(data, threshold = 0.3) {
       
       # 保留至少有一個非 NA 值的行
       non_empty_rows <- row_non_na_count > 0
+
+      # Log which rows are being removed (MP106 - transparency)
+      if (any(!non_empty_rows)) {
+        removed_indices <- which(!non_empty_rows)
+        for (idx in removed_indices) {
+          if ("product_id" %in% colnames(current_data) && "brand" %in% colnames(current_data)) {
+            message(sprintf("    Removing row %d: product_id='%s', brand='%s' (all attributes NA)",
+                          idx,
+                          current_data$product_id[idx],
+                          current_data$brand[idx]))
+          }
+        }
+      }
+
       current_data <- current_data[non_empty_rows, ]
-      
-      message(sprintf("  ✂️  步驟1 - 移除空行：保留 %d/%d 行", 
+
+      message(sprintf("  ✂️  步驟1 - 移除空行：保留 %d/%d 行",
                      sum(non_empty_rows), original_rows))
     }
   }
@@ -138,10 +169,10 @@ positionTableFilterUI <- function(id, translate = identity) {
       options = list(plugins = list('remove_button', 'drag_drop'))
     ),
     
-    # product ID filter (label will be updated dynamically based on platform)
+    # Item ID filter (label will be updated dynamically based on platform)
     selectizeInput(
       inputId = ns("product_id"),
-      label = translate("product ID"),  # Default label, will be updated by server
+      label = translate("Item ID"),  # Default label, will be updated by server
       choices = NULL,
       multiple = TRUE,
       options = list(plugins = list('remove_button', 'drag_drop'))
@@ -387,15 +418,26 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
         # Check if product_id column exists, if not try to find platform-specific column
         if (!"product_id" %in% colnames(filtered_data) && nrow2(filtered_data) > 0) {
           platform <- platform_id()
-          product_col <- switch(platform,
+
+          # Ensure platform is a scalar value for switch statement
+          if (is.null(platform) || length(platform) == 0) {
+            platform <- "default"
+          } else if (length(platform) > 1) {
+            warning("platform_id() returned multiple values, using first: ", paste(platform, collapse=", "))
+            platform <- as.character(platform[1])
+          } else {
+            platform <- as.character(platform)
+          }
+
+          item_col <- switch(platform,
             "2" = "asin",  # Amazon
-            "3" = "ebay_product_number",  # eBay
+            "3" = "ebay_item_number",  # eBay
             "product_id"  # Default fallback
           )
           
-          if (product_col %in% colnames(filtered_data)) {
-            message("DEBUG: Renaming '", product_col, "' to 'product_id' in positionTable")
-            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(product_col))
+          if (item_col %in% colnames(filtered_data)) {
+            message("DEBUG: Renaming '", item_col, "' to 'product_id' in positionTable")
+            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(item_col))
           } else {
             warning("No product identifier column found in position data. Available columns: ", paste(colnames(filtered_data), collapse = ", "))
           }
@@ -470,7 +512,7 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
                         selected = selected)
     })
     
-    # Update product ID filter choices when position data changes or brand selection changes
+    # Update Item ID filter choices when position data changes or brand selection changes
     observe({
       # Get the full dataset (already filtered by product_line_id)
       data <- position_data()
@@ -478,7 +520,7 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
       # Handle empty data
       if (is.null(data) || nrow2(data) == 0) {
         updateSelectizeInput(session, "product_id",
-                          choices = c("No product IDs available" = ""),
+                          choices = c("No Item IDs available" = ""),
                           selected = character(0))
         return()
       }
@@ -495,8 +537,8 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
         data <- data %>% dplyr::filter(brand %in% input$brand)
       }
       
-      # Get unique product IDs within the current product line, excluding "Ideal", "Rating", and "Revenue"
-      product_ids <- data %>%
+      # Get unique Product IDs within the current product line, excluding "Ideal", "Rating", and "Revenue"
+      item_ids <- data %>%
         dplyr::filter(!product_id %in% c("Ideal", "Rating", "Revenue")) %>%
         dplyr::pull(product_id) %>%
         as.character() %>%  # Ensure character conversion
@@ -505,16 +547,16 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
         sort()
       
       # Handle empty product_ids case
-      if (length(product_ids) == 0) {
-        product_ids <- character(0)
+      if (length(item_ids) == 0) {
+        item_ids <- character(0)
       }
       
       # Maintain current selections if possible (within current product line)
-      selected <- intersect(input$product_id, product_ids)
+      selected <- intersect(input$product_id, item_ids)
       
       # Update the selectize input
       updateSelectizeInput(session, "product_id",
-                        choices = product_ids,
+                        choices = item_ids,
                         selected = selected)
     })
     
@@ -536,7 +578,7 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
         data <- data %>% dplyr::filter(brand %in% input$brand)
       }
       
-      # Apply product ID filter if selected (within the product line)
+      # Apply item ID filter if selected (within the product line)
       if (length(input$product_id) > 0) {
         data <- data %>% dplyr::filter(product_id %in% input$product_id)
       }
@@ -558,7 +600,7 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
     })
     
     # ------------ Filter logic ------------------------------------
-    # Update product ID label based on platform
+    # Update Item ID label based on platform
     observe({
       # Source the helper function if not available
       if (!exists("get_product_id_label")) {
@@ -614,11 +656,11 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
         message("After brand filter: ", nrow(data), " rows")
       }
       
-      # Apply product ID filter directly from input if selected
+      # Apply Item ID filter directly from input if selected
       if (length(input$product_id) > 0) {
-        message("Applying product ID filter: ", paste(input$product_id, collapse = ", "))
+        message("Applying Item ID filter: ", paste(input$product_id, collapse = ", "))
         data <- data %>% dplyr::filter(product_id %in% input$product_id)
-        message("After product ID filter: ", nrow(data), " rows")
+        message("After Item ID filter: ", nrow(data), " rows")
       }
       
       # First check that we have brand column in the data
@@ -725,7 +767,7 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
         fixedColumns = list(leftColumns = 2),  # 固定前兩欄（product_id, brand）
         autoWidth = FALSE,  # 防止自動調整欄位寬度
         columnDefs = list(
-          list(width = '100px', targets = 0),  # product ID 欄位寬度
+          list(width = '100px', targets = 0),  # Item ID 欄位寬度
           list(width = '120px', targets = 1),  # Brand 欄位寬度
           list(width = '80px', targets = '_all')  # 其他欄位預設寬度
         ),
@@ -835,15 +877,32 @@ positionTableServer <- function(id, app_data_connection = NULL, config = NULL,
       if (product_line_id() == "all") {
         return("Please select a specific product line to view position data. Different product lines cannot be compared directly.")
       }
-      
+
+      # MP031: Defensive programming - check for NULL/empty values before switch
+      # R113: Error handling for reactive expressions
+      status_val <- tryCatch({
+        component_status()
+      }, error = function(e) {
+        warning("Error getting component status: ", e$message)
+        "idle"
+      })
+
+      # MP099: Defensive check for NULL or empty status
+      if (is.null(status_val) || length(status_val) == 0 || status_val == "") {
+        return("Ready to filter data")
+      }
+
+      # Ensure status_val is character and length 1 for switch
+      status_val <- as.character(status_val)[1]
+
       # Standard status messages
-      switch(component_status(),
+      switch(status_val,
              idle = "Ready to filter data",
              loading = "Loading data...",
              ready = paste0("Data loaded with ", nrow2(position_data()), " records"),
              computing = "Computing results...",
              error = "Error loading data",
-             component_status())
+             status_val)  # Default: return the status value itself
     })
     
     # Return reactive values for external use

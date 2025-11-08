@@ -1,0 +1,184 @@
+---
+title: "SO_R018: Function File Naming Rule"
+subtitle: "Establishes a consistent naming convention for function files, clarifying when and how to use the 'fn_' prefix in filenames, while ensuring clear distinction between function file names and function object names"
+chapter: "CH01"
+category: "rule"
+number: "SO_R018"
+date-created: "2025-08-18"
+date-modified: "2025-08-18"
+author: "Claude"
+type: "rule"
+law: "Structure & Organization Law"
+article: 
+  number: 18
+  title: "Function File Naming Rule"
+implements:
+  - "R019: Object Naming Convention"
+  - "R021: One Function One File"
+  - "R023: Object File Name Translation"
+related_to:
+  - "R001: File Naming Convention"
+  - "MP047: Functional Programming"
+  - "R067: Functional Encapsulation"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-tools: true
+    number-sections: true
+---
+
+# Article 18: Function File Naming Rule {#overview}
+
+**Structure & Organization Law Article 18 (Function File Naming Rule)**
+
+This rule establishes a consistent naming convention for function files.
+
+:::{.callout-important}
+## Core Requirement
+Establishes a consistent naming convention for function files, clarifying when and how to use the "fn_" prefix in filenames, while ensuring clear distinction between function file names and function object names.
+:::
+
+# Section 1: Implementation Principles {#implementation}
+
+## Subsection 1: Function File Naming Pattern {#file-naming-pattern}
+
+All files containing function definitions must follow this naming pattern:
+
+```
+fn_[function_name].R
+```
+
+Where:
+- `fn_` is a required prefix for the file name
+- `[function_name]` follows the object naming convention from R0019, with dots replaced by underscores per R23
+- `.R` is the file extension for R scripts
+
+## Subsection 2: Function Object Naming Pattern {#object-naming-pattern}
+
+Within function files, the function object itself must be named according to R0019 Object Naming Convention without the "fn_" prefix:
+
+```r
+# File: fn_calculate_revenue.R
+calculate_revenue <- function(sales_data, date_range) {
+  # Function implementation
+}
+```
+
+## Subsection 3: One Function One File {#one-function-one-file}
+
+Following R0021 (One Function One File), each function file should contain exactly one primary function, with the file named after that function:
+
+```r
+# File: fn_process_customer_data.R
+process_customer_data <- function(customer_id) {
+  # Primary function implementation
+  
+  # Helper functions may be included if they are only used within this function
+  validate_id <- function(id) {
+    # Helper function implementation
+  }
+  
+  # Function implementation using the helper
+  validate_id(customer_id)
+  # Rest of implementation
+}
+```
+
+## Subsection 4: Function File Organization {#file-organization}
+
+Function files should be organized according to their purpose and domain:
+
+1. **Utilities**: General-purpose functions should be placed in the `04_utils` directory
+2. **Module-specific**: Functions specific to a module should be placed in the module's directory
+3. **Domain-specific**: Functions specific to a domain should be placed in the domain's directory
+
+# Section 2: Valid Examples {#valid-examples}
+
+## Subsection 1: Standard Utility Function {#standard-utility}
+
+```
+File path: update_scripts/global_scripts/04_utils/fn_clean_data.R
+
+# Function implementation
+clean_data <- function(data) {
+  # Implementation
+}
+```
+
+## Subsection 2: Module Function {#module-function}
+
+```
+File path: update_scripts/global_scripts/10_rshinyapp_components/micro/customer_profile/fn_format_customer_data.R
+
+# Function implementation
+format_customer_data <- function(customer_data) {
+  # Implementation
+}
+```
+
+## Subsection 3: Function with Type Prefix {#type-prefix-function}
+
+```
+File path: update_scripts/global_scripts/04_utils/fn_dt_transform_dates.R
+
+# Function implementation
+dt.transform_dates <- function(data, format = "%Y-%m-%d") {
+  # Implementation
+}
+```
+
+# Section 3: Invalid Patterns {#invalid-patterns}
+
+## Subsection 1: Missing File Prefix {#missing-file-prefix}
+
+```
+# INCORRECT: Missing fn_ prefix in filename
+File path: update_scripts/global_scripts/04_utils/clean_data.R
+
+clean_data <- function(data) {
+  # Implementation
+}
+```
+
+## Subsection 2: Prefix in Function Name {#prefix-in-function-name}
+
+```
+# INCORRECT: fn_ prefix included in function name
+File path: update_scripts/global_scripts/04_utils/fn_clean_data.R
+
+fn_clean_data <- function(data) {  # Wrong - should be just "clean_data"
+  # Implementation
+}
+```
+
+## Subsection 3: Inconsistent Naming {#inconsistent-naming}
+
+```
+# INCORRECT: Function name doesn't match filename
+File path: update_scripts/global_scripts/04_utils/fn_clean_data.R
+
+format_data <- function(data) {  # Wrong - should be "clean_data"
+  # Implementation
+}
+```
+
+# Section 4: Verification Process {#verification-process}
+
+1. **File Naming Check**: Ensure all function files follow the `fn_*` naming pattern
+2. **Function Name Check**: Verify function object names do not include the `fn_` prefix
+3. **Consistency Check**: Confirm function object names match their file names (minus the prefix and with dots replaced by underscores)
+
+# Section 5: Benefits {#benefits}
+
+1. **Clarity**: Clear distinction between function files and function objects
+2. **Consistency**: Uniform naming across the codebase
+3. **Navigability**: Makes code easier to navigate and discover
+4. **Maintainability**: Simplifies maintenance and refactoring
+5. **IDE Support**: Better supports IDE features like autocomplete and search
+
+---
+
+*Based on: Structure & Organization Law Article 18*  
+*Related to: [R021 One Function One File](./SO_R021_one_function_one_file.qmd), [MP047 Functional Programming](../../CH00_fundamental_principles/meta_principles/MP047_functional_programming.qmd)*

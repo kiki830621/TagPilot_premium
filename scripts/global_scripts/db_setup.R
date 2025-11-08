@@ -21,7 +21,7 @@ initialize_database_connections <- function(verbose = TRUE) {
   }
   
   # Source get_default_db_paths
-  paths_function_path <- file.path(db_utils_dir, "fn_get_default_db_paths.R")
+  paths_function_path <- file.path(db_utils_dir, "duckdb", "fn_get_default_db_paths.R")
   if(file.exists(paths_function_path)) {
     source(paths_function_path)
     if(verbose) message("Sourced database paths function from: ", paths_function_path)

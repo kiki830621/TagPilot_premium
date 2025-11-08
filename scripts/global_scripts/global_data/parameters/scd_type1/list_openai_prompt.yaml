@@ -1,0 +1,455 @@
+# OpenAI Prompt Configuration for MAMBA Dashboard
+# Central repository for all AI prompts used across the dashboard
+# Version: 1.0
+# Last Updated: 2025-08-04
+
+metadata:
+  version: "v1.0"
+  effective_date: "2025-08-04"
+  description: "Centralized OpenAI prompt templates for MAMBA dashboard components"
+  maintainer: "MAMBA Development Team"
+  purpose: "Standardize and manage all AI-generated insights across dashboard modules"
+
+# ============================================================================
+# SECTION 1: System Prompts (Common across modules)
+# ============================================================================
+system_prompts:
+  marketing_consultant:
+    role: "system"
+    content: "你是專業的電商行銷顧問，擅長數據分析和策略制定。請用繁體中文回答，提供具體可執行的建議。"
+  
+  data_analyst:
+    role: "system"
+    content: "你是資深的數據分析師，專精於電商數據解讀和商業洞察。請用繁體中文提供深入且易懂的分析。"
+  
+  product_strategist:
+    role: "system"
+    content: "你是產品策略專家，擅長產品定位和市場分析。請用繁體中文回答，著重實用性建議。"
+  
+  customer_insights_expert:
+    role: "system"
+    content: "你是客戶洞察專家，專注於客戶行為分析和市場區隔。請用繁體中文提供精準的客戶分析。"
+
+# ============================================================================
+# SECTION 2: Position Analysis Prompts
+# ============================================================================
+position_analysis:
+  # Market Segmentation (CSA) Analysis
+  csa_market_segments:
+    model: "o4-mini"
+    system_prompt: "{system_prompts.marketing_consultant.content}"
+    user_prompt_template: |
+      根據以下市場區隔分析結果，提供市場策略建議：
+      
+      ## 分析數據：
+      {segment_summary}
+      
+      ## 產品分佈：
+      {product_distribution}
+      
+      請按以下格式輸出：
+      
+      ### 1. 市場區隔洞察
+      分析各區隔的特徵和市場地位
+      
+      ### 2. 競爭定位建議
+      - 優勢區隔：如何鞏固
+      - 劣勢區隔：如何改善
+      - 空白區隔：是否進入
+      
+      ### 3. 產品組合優化
+      基於區隔分析的產品線調整建議
+      
+      限制在 400 字內
+  
+  # Strategic Positioning Analysis
+  strategic_positioning:
+    model: "o3"
+    system_prompt: "{system_prompts.product_strategist.content}"
+    user_prompt_template: |
+      基於以下產品定位分析，提供策略建議：
+
+      ## 四象限分析結果：
+      - 訴求象限：{appeal_products}
+      - 改善象限：{improve_products}
+      - 劣勢象限：{weakness_products}
+      - 改變象限：{change_products}
+
+      ## 關鍵指標：
+      {key_metrics}
+
+      請提供：
+      1. 各象限產品的具體行動方案
+      2. 資源配置優先順序
+      3. 短期（3個月）vs 長期（1年）策略
+
+      限制在 450 字內
+
+  # Strategy Quadrant Analysis (from positionStrategy)
+  strategy_quadrant_analysis:
+    model: "o4-mini"
+    system_prompt: "{system_prompts.product_strategist.content}"
+    user_prompt_template: |
+      根據四象限策略分析結果，為該產品提供具體的行銷策略建議。請使用以下 markdown 架構，但**只顯示該產品實際有因素的部分**：
+
+      ## 產品策略分析
+
+      ### 訴求
+      （僅當 {appeal_factors} 有內容時顯示此部分）
+      基於該產品的優勢因素，建議如何在行銷中突出這些優勢。
+
+      ### 改善
+      （僅當 {improvement_factors} 有內容時顯示此部分）
+      基於可改善因素，提出產品優化方向。
+
+      ### 劣勢
+      （僅當 {weakness_factors} 有內容時顯示此部分）
+      基於弱勢因素，建議如何在行銷中減少負面影響。
+
+      ### 改變
+      （僅當 {change_factors} 有內容時顯示此部分）
+      基於需要改變的因素，提出重點改進建議。
+
+      **重要規則**：
+      - 如果某個象限沒有因素（空白或無內容），請完全跳過該部分的標題和內容
+      - 針對具體的因素變數提供實用的策略建議和廣告文案方向
+      - 保持 markdown 格式，不要用程式碼區塊包起來
+      - 字數限制300字內
+
+      四象限分析資料：{strategy_data}
+
+# ============================================================================
+# SECTION 3: Poisson Analysis Prompts
+# ============================================================================
+poisson_analysis:
+  # Comment Analysis (Market Track)
+  market_track_strategy:
+    model: "o4-mini"
+    system_prompt: "你是專業的電商口碑管理顧問，擅長評分優化和市場定位策略。請用繁體中文回答。"
+    user_prompt_template: |
+      根據以下市場賽道（口碑評分）分析數據，提供策略報告。
+      
+      ## 口碑類型影響力統計：
+      {rating_summary}
+      
+      ## 前8大影響因素：
+      {top_factors}
+      
+      請按以下格式輸出：
+      
+      ## 🌟 市場賽道策略報告
+      
+      ### 1. 口碑影響力診斷
+      分析哪些口碑因素對銷量影響最大，說明賽道倍數的商業意義。
+      
+      ### 2. 評分提升行動方案
+      針對影響力最大的3個因素，各提供一項具體改善建議，格式：
+      - 因素名稱：具體行動（20字內）
+      
+      ### 3. 競爭者對比策略
+      基於口碑賽道分析，建議：
+      - 如何突出優勢評分
+      - 如何改善劣勢評分
+      - 市場定位調整方向
+      
+      ### 4. 新產品開發建議
+      根據高影響力的口碑因素，建議下一代產品應：
+      - 強化哪些屬性（基於高賽道倍數因素）
+      - 改進哪些功能（基於負面評價因素）
+      - 創新方向（基於市場缺口）
+      
+      **注意**：
+      - 保持專業但易懂的語言
+      - 提供具體可執行的建議
+      - 限制在 450 字內
+  
+  # Feature Analysis (Precision Marketing)
+  precision_marketing_strategy:
+    model: "o4-mini"
+    system_prompt: "{system_prompts.data_analyst.content}"
+    user_prompt_template: |
+      根據以下產品屬性影響力分析，提供精準行銷策略。
+      
+      ## 屬性影響力統計：
+      {attributes_summary}
+      
+      ## 關鍵屬性詳情：
+      {key_attributes}
+      
+      請按以下格式輸出：
+      
+      ### 📊 產品屬性重要性分析
+      
+      #### 1. 關鍵正向屬性（前5項）
+      針對賽道倍數最高的5個屬性，各提供一句20字內的轉化放大語句，可直接用於亞馬遜商品頁。
+      
+      #### 2. 行銷文案建議
+      基於最重要的3個屬性，提供：
+      - 標題優化建議（突出關鍵屬性）
+      - Bullet Points 重點（每點15字內）
+      - A+ Content 視覺重點
+      
+      #### 3. 廣告投放策略
+      - 關鍵字選擇（基於高影響力屬性）
+      - 受眾定位（誰最重視這些屬性）
+      - 預算配置（按屬性重要性分配）
+      
+      #### 4. 產品改進優先序
+      列出前3個最值得改進的屬性及原因
+      
+      限制在 500 字內
+  
+  # Product Development Suggestions
+  product_development_strategy:
+    model: "o3"
+    system_prompt: "{system_prompts.product_strategist.content}"
+    user_prompt_template: |
+      請詳實列出所有邊際效用正值的變數，並依據係數大小排序，依序提出新產品開發的建議。
+      
+      ## 正向影響屬性資料：
+      {positive_attributes}
+      
+      請按以下格式輸出：
+      
+      ## 🚀 AI 新產品開發建議報告
+      
+      ### 1. 高影響力屬性分析
+      分析係數最高的前5個屬性，說明它們對銷量的正向影響程度。
+      
+      ### 2. 產品開發優先順序
+      基於屬性影響力，建議新產品開發的優先順序：
+      - 核心功能（賽道倍數>2.0的屬性）
+      - 增值功能（賽道倍數1.2-2.0的屬性）
+      - 輔助功能（其他正向屬性）
+      
+      ### 3. 具體產品改進建議
+      針對影響力最大的3個屬性，各提供：
+      - 屬性名稱：具體改進方向（25字內）
+      - 預期效果：對銷量的潛在影響
+      
+      ### 4. 市場機會評估
+      基於正向屬性分析：
+      - 未來產品趨勢預測
+      - 競爭優勢建立方向
+      - 目標客群偏好分析
+      
+      **注意**：
+      - 提供可執行的產品開發建議
+      - 基於數據證據支持建議
+      - 限制在 500 字內
+  
+  # Time Analysis
+  time_trend_analysis:
+    model: "o4-mini"
+    system_prompt: "{system_prompts.data_analyst.content}"
+    user_prompt_template: |
+      基於以下時間趨勢分析，提供市場洞察：
+      
+      ## 時間段表現：
+      {time_performance}
+      
+      ## 趨勢變化：
+      {trend_changes}
+      
+      請分析：
+      1. 銷售高峰期特徵與原因
+      2. 低谷期的改善策略
+      3. 季節性行銷建議
+      4. 庫存管理優化方向
+      
+      限制在 350 字內
+
+# ============================================================================
+# SECTION 4: Customer Analysis Prompts
+# ============================================================================
+customer_analysis:
+  # Customer DNA Analysis
+  customer_dna_insights:
+    model: "o3"
+    system_prompt: "{system_prompts.customer_insights_expert.content}"
+    user_prompt_template: |
+      根據以下客戶 DNA 分析結果，提供客戶策略建議：
+      
+      ## RFM 分析結果：
+      {rfm_summary}
+      
+      ## 客戶分群特徵：
+      {segment_characteristics}
+      
+      ## 價值分佈：
+      {value_distribution}
+      
+      請提供：
+      
+      ### 1. 客戶群體診斷
+      - 各群體的商業價值評估
+      - 健康度分析（流失風險）
+      
+      ### 2. 差異化經營策略
+      針對每個主要客群：
+      - 溝通策略（頻率、內容、渠道）
+      - 產品推薦策略
+      - 優惠策略
+      
+      ### 3. 客戶價值提升計劃
+      - 如何提升低價值客戶
+      - 如何維護高價值客戶
+      - 如何激活沉睡客戶
+      
+      限制在 450 字內
+  
+  # Micro Customer Analysis
+  micro_customer_strategy:
+    model: "o4-mini"
+    system_prompt: "{system_prompts.customer_insights_expert.content}"
+    user_prompt_template: |
+      基於以下個體客戶分析，提供精準營銷建議：
+      
+      ## 客戶概況：
+      {customer_profile}
+      
+      ## 購買行為：
+      {purchase_behavior}
+      
+      ## 偏好分析：
+      {preference_analysis}
+      
+      請提供個性化策略：
+      1. 下次購買時機預測與觸達策略
+      2. 產品推薦清單（基於歷史偏好）
+      3. 專屬優惠設計
+      4. 忠誠度提升方案
+      
+      限制在 300 字內
+
+# ============================================================================
+# SECTION 5: Integration and Reporting Prompts
+# ============================================================================
+integrated_insights:
+  # Executive Summary
+  executive_dashboard_summary:
+    model: "o3"
+    system_prompt: "你是資深的商業策略顧問，擅長整合多維度數據提供執行層級的洞察。請用繁體中文撰寫。"
+    user_prompt_template: |
+      整合以下各模組分析結果，提供執行摘要：
+      
+      ## 市場定位分析：
+      {position_summary}
+      
+      ## 產品屬性影響：
+      {product_attributes}
+      
+      ## 客戶洞察：
+      {customer_insights}
+      
+      ## 口碑表現：
+      {reputation_metrics}
+      
+      請撰寫執行摘要：
+      
+      ### 📊 經營現況總覽
+      （100字內的整體診斷）
+      
+      ### 🎯 三大關鍵發現
+      1. [最重要的洞察]
+      2. [次重要的發現]
+      3. [潛在機會或風險]
+      
+      ### 💡 行動建議優先序
+      - 立即行動（1個月內）：
+      - 短期改善（3個月內）：
+      - 中期佈局（6個月內）：
+      
+      ### 📈 預期成效
+      若執行建議，預估可帶來的改善
+      
+      限制在 500 字內
+
+# ============================================================================
+# SECTION 6: Prompt Engineering Guidelines
+# ============================================================================
+guidelines:
+  formatting:
+    - "使用 Markdown 格式化輸出"
+    - "數字使用阿拉伯數字"
+    - "百分比保留到小數點後一位"
+    - "金額使用千分位符號"
+  
+  tone:
+    - "專業但不艱澀"
+    - "具體且可執行"
+    - "正面積極的語調"
+    - "避免過度技術性用語"
+  
+  structure:
+    - "先總結後細節"
+    - "使用條列式說明"
+    - "每段不超過 100 字"
+    - "結論必須可行動"
+  
+  constraints:
+    - "遵守字數限制"
+    - "不做無根據的預測"
+    - "基於數據說話"
+    - "承認數據限制"
+
+# ============================================================================
+# SECTION 7: Usage Instructions
+# ============================================================================
+usage:
+  description: |
+    此配置檔集中管理 MAMBA 儀表板中所有 OpenAI API 的 prompt 模板。
+    使用時可通過 YAML 解析器載入，並使用字串替換填入實際數據。
+  
+  example_code: |
+    # R 範例
+    library(yaml)
+    
+    # 載入 prompt 配置
+    prompts <- yaml::read_yaml("list_openai_prompt.yaml")
+    
+    # 取得特定 prompt
+    market_track_prompt <- prompts$poisson_analysis$market_track_strategy
+    
+    # 替換模板變數
+    user_content <- gsub("{rating_summary}", 
+                        jsonlite::toJSON(rating_data), 
+                        market_track_prompt$user_prompt_template)
+    
+    # 使用 prompt
+    messages <- list(
+      list(role = "system", content = market_track_prompt$system_prompt),
+      list(role = "user", content = user_content)
+    )
+    
+    # 呼叫 OpenAI API (使用配置檔指定的模型)
+    response <- openai::create_chat_completion(
+      model = market_track_prompt$model,  # 使用 YAML 指定的模型
+      messages = messages
+    )
+  
+  variable_substitution:
+    description: "使用 {variable_name} 格式標記需要替換的變數"
+    special_cases:
+      - "{system_prompts.*.content}: 引用其他系統提示"
+      - "{data}: 插入 JSON 格式的數據"
+      - "{list}: 插入條列式清單"
+  
+  model_selection_guide:
+    description: "每個 prompt 都包含 model 欄位，可指定使用的 OpenAI 模型"
+    available_models:
+      - "o3: 最強推理能力，適合複雜策略分析、高階報告"
+      - "o4-mini: 快速回應模型，適合日常分析、互動式任務"
+    selection_strategy: "80% 使用 o4-mini (日常儀表板)，20% 使用 o3 (高階決策)"
+    current_assignments:
+      strategic_analysis_tasks:
+        - "戰略定位分析: o3 (深度策略思考)"
+        - "客戶 DNA 洞察: o3 (深度客戶分析)"
+        - "執行摘要報告: o3 (高層決策支援)"
+        - "新產品開發建議: o3 (創新產品策略)"
+      daily_dashboard_tasks:
+        - "精準行銷策略: o4-mini (標準分析任務)"
+        - "時間趨勢分析: o4-mini (數據解讀)"
+        - "市場區隔分析: o4-mini (基礎分析)"
+        - "個體客戶策略: o4-mini (單一客戶分析)"
+        - "市場賽道策略: o4-mini (口碑管理策略)"

@@ -247,15 +247,26 @@ positionDNAPlotlyServer <- function(id, app_data_connection = NULL, config = NUL
         # Check if product_id column exists, if not try to find platform-specific column
         if (!"product_id" %in% names(filtered_data) && nrow(filtered_data) > 0) {
           platform <- platform_id()
-          product_col <- switch(platform,
+
+          # Ensure platform is a scalar value for switch statement
+          if (is.null(platform) || length(platform) == 0) {
+            platform <- "default"
+          } else if (length(platform) > 1) {
+            warning("platform_id() returned multiple values, using first: ", paste(platform, collapse=", "))
+            platform <- as.character(platform[1])
+          } else {
+            platform <- as.character(platform)
+          }
+
+          item_col <- switch(platform,
             "2" = "asin",  # Amazon
-            "3" = "ebay_product_number",  # eBay
+            "3" = "ebay_item_number",  # eBay
             "product_id"  # Default fallback
           )
           
-          if (product_col %in% names(filtered_data)) {
-            message("DEBUG: Renaming '", product_col, "' to 'product_id' in positionDNAPlotly")
-            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(product_col))
+          if (item_col %in% names(filtered_data)) {
+            message("DEBUG: Renaming '", item_col, "' to 'product_id' in positionDNAPlotly")
+            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(item_col))
           } else {
             warning("No product identifier column found in DNA position data. Available columns: ", paste(names(filtered_data), collapse = ", "))
           }
@@ -430,17 +441,30 @@ positionDNAPlotlyServer <- function(id, app_data_connection = NULL, config = NUL
     
     # Display component status
     output$component_status <- renderText({
-      if (product_line_id() == "all") {
-        return("Please select a specific product line to view DNA visualization")
+      # MP031: Defensive programming - check for NULL/empty values before switch
+      # R113: Error handling for reactive expressions
+      status_val <- tryCatch({
+        component_status()
+      }, error = function(e) {
+        warning("Error getting component status: ", e$message)
+        "idle"
+      })
+
+      # MP099: Defensive check for NULL or empty status
+      if (is.null(status_val) || length(status_val) == 0 || status_val == "") {
+        return("Ready for position analysis")
       }
-      
-      switch(component_status(),
-             idle = "Ready to visualize DNA data",
-             loading = "Loading DNA data...",
-             ready = paste0("DNA data loaded with ", nrow(dna_data()), " records"),
-             computing = "Computing visualization...",
-             error = "Error loading DNA data",
-             component_status())
+
+      # Ensure status_val is character and length 1 for switch
+      status_val <- as.character(status_val)[1]
+
+      switch(status_val,
+             idle = "Ready for position analysis",
+             loading = "Loading position data...",
+             ready = paste0("Position data loaded: ", nrow(position_data()), " records"),
+             computing = "Computing position metrics...",
+             error = "Error loading position data",
+             status_val)  # Default: return the status value itself
     })
     
     # Return reactive values for external use

@@ -15,7 +15,7 @@
 # Features:
 #   • Ideal Rate Analysis based on key factors
 #   • Interactive data table display with scoring
-#   • Brand and product ID ranking by ideal distance
+#   • Brand and Item ID ranking by ideal distance
 #   • Automatic key factor identification
 #   • Real-time filtering and sorting capabilities
 # -----------------------------------------------------------------------------
@@ -34,19 +34,24 @@
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
 # Data transformation functions (MP47) ----------------------------------------
-#' Perform ideal rate analysis
+#' Perform ideal rate analysis following MK03 principle
 #' @param data data.frame. Position data with numerical attributes
 #' @param exclude_vars character vector. Variables to exclude from analysis
-#' @param threshold_multiplier numeric. Multiplier for the threshold (default: 1.0)
+#' @param threshold_multiplier numeric. DEPRECATED - kept for backward compatibility
+#' @param n_key_factors numeric. Number of key factors to select when using "top_n" method (default: 8)
+#' @param selection_method character. Method for selecting key factors: "cross_average" (MK03 principle) or "top_n" (default: "cross_average")
 #' @return list. Contains ideal analysis results with scores and rankings
-perform_ideal_rate_analysis <- function(data, exclude_vars = NULL, threshold_multiplier = 1.0) {
+perform_ideal_rate_analysis <- function(data, exclude_vars = NULL,
+                                       threshold_multiplier = 0.3,  # DEPRECATED
+                                       n_key_factors = 8,
+                                       selection_method = "cross_average") {
   # Check if product_id column exists, if not look for platform-specific columns
   if (!"product_id" %in% names(data)) {
     # Try common platform-specific columns
     if ("asin" %in% names(data)) {
       data <- data %>% dplyr::rename(product_id = asin)
-    } else if ("ebay_product_number" %in% names(data)) {
-      data <- data %>% dplyr::rename(product_id = ebay_product_number)
+    } else if ("ebay_item_number" %in% names(data)) {
+      data <- data %>% dplyr::rename(product_id = ebay_item_number)
     } else {
       warning("No product identifier column found in ideal rate analysis data")
       return(list(
@@ -93,30 +98,53 @@ perform_ideal_rate_analysis <- function(data, exclude_vars = NULL, threshold_mul
   # Create indicators matrix
   df_no_ideal <- df_analysis %>% dplyr::filter(product_id != "Ideal")
   
-  # Calculate ideal comparison for each numeric column
+  # CORRECTED ALGORITHM following MK03 principle
+  # Step 1: Extract the ideal point vector (single m-dimensional vector)
+  ideal_point_vector <- as.numeric(ideal_row[numeric_cols])
+  names(ideal_point_vector) <- numeric_cols
+
+  # Remove any NA values from ideal point vector
+  valid_ideal <- ideal_point_vector[!is.na(ideal_point_vector)]
+
+  if (length(valid_ideal) == 0) {
+    warning("No valid ideal values found")
+    return(list(
+      ideal_analysis = data.frame(),
+      key_factors = character(0),
+      indicators = data.frame()
+    ))
+  }
+
+  # Step 2: Identify key factors using MK03 principle
+  # Key factors are attributes where ideal score > cross-attribute average
+  if (selection_method == "cross_average") {
+    # Method 1: Cross-attribute average threshold (MK03 original method)
+    cross_attr_avg <- mean(valid_ideal, na.rm = TRUE)
+    key_factors <- names(valid_ideal[valid_ideal > cross_attr_avg])
+  } else {
+    # Method 2: Select top N factors by score (ensures exactly N factors)
+    # Sort ideal point values in descending order and take top N
+    sorted_factors <- names(sort(valid_ideal, decreasing = TRUE))
+    n_to_select <- min(n_key_factors, length(sorted_factors))
+    key_factors <- sorted_factors[1:n_to_select]
+  }
+
+  # Step 3: Create indicators matrix for scoring products
+  # This compares each product to ideal values ONLY for key factors
   indicators <- data.frame(matrix(0, nrow = nrow(df_no_ideal), ncol = length(numeric_cols)))
   colnames(indicators) <- numeric_cols
-  
+
   for (col in numeric_cols) {
     ideal_val <- ideal_row[[col]][1]
     if (!is.na(ideal_val) && is.numeric(ideal_val) && is.finite(ideal_val)) {
-      # Compare each value to ideal, handling NA values explicitly
       col_values <- df_no_ideal[[col]]
-      # Only include non-NA values in comparison, set NA values to 0
+      # Products achieve ideal if they meet or exceed the ideal value
       comparison_result <- ifelse(is.na(col_values), 0, ifelse(col_values >= ideal_val, 1, 0))
       indicators[[col]] <- comparison_result
     } else {
-      # If ideal value is NA or invalid, set all indicators to 0
       indicators[[col]] <- rep(0, nrow(df_no_ideal))
     }
   }
-  
-  # Calculate gate (threshold) for key factor identification
-  gate <- rowSums(indicators, na.rm = TRUE) / ncol(indicators) * threshold_multiplier
-  
-  # Identify key factors (columns where ideal comparison > gate)
-  col_sums <- colSums(indicators, na.rm = TRUE)
-  key_factors <- names(col_sums[col_sums > mean(gate, na.rm = TRUE)])
   
   # Create ideal analysis (IA) - following KitchenMAMA methodology
   if (length(key_factors) > 0) {
@@ -126,7 +154,7 @@ perform_ideal_rate_analysis <- function(data, exclude_vars = NULL, threshold_mul
     # Calculate score as row sum
     IA <- IA %>% dplyr::mutate(Score = rowSums(IA, na.rm = TRUE))
     
-    # Add brand and product_id information
+    # Add brand and item_id information
     IA <- IA %>%
       dplyr::bind_cols(
         brand = df_no_ideal$brand,
@@ -147,7 +175,10 @@ perform_ideal_rate_analysis <- function(data, exclude_vars = NULL, threshold_mul
     ideal_analysis = ideal_analysis,
     key_factors = key_factors,
     indicators = indicators,
-    gate_threshold = mean(gate, na.rm = TRUE)
+    ideal_point_vector = valid_ideal,  # Include the actual ideal point vector
+    cross_attr_avg = if (exists("cross_attr_avg")) cross_attr_avg else mean(valid_ideal),
+    n_key_factors = length(key_factors),
+    selection_method = selection_method
   ))
 }
 
@@ -164,29 +195,9 @@ positionIdealRateFilterUI <- function(id, translate = identity) {
     style = "padding:15px;",
     h4(translate("Ideal Rate Analysis Settings")),
     
-    # Threshold multiplier
-    sliderInput(
-      inputId = ns("threshold_multiplier"),
-      label = translate("Analysis Sensitivity"),
-      min = 0.5,
-      max = 2.0,
-      value = 1.0,
-      step = 0.1
-    ),
-    
     # Display options
     hr(),
     h4(translate("Display Options")),
-    
-    # Maximum rows to display
-    sliderInput(
-      inputId = ns("max_rows"),
-      label = translate("Maximum products to display"),
-      min = 10,
-      max = 100,
-      value = 50,
-      step = 10
-    ),
     
     # Show all columns
     checkboxInput(
@@ -311,15 +322,26 @@ positionIdealRateServer <- function(id, app_data_connection = NULL, config = NUL
         # Check if product_id column exists, if not try to find platform-specific column
         if (!"product_id" %in% names(filtered_data) && nrow(filtered_data) > 0) {
           platform <- platform_id()
-          product_col <- switch(platform,
+
+          # Ensure platform is a scalar value for switch statement
+          if (is.null(platform) || length(platform) == 0) {
+            platform <- "default"
+          } else if (length(platform) > 1) {
+            warning("platform_id() returned multiple values, using first: ", paste(platform, collapse=", "))
+            platform <- as.character(platform[1])
+          } else {
+            platform <- as.character(platform)
+          }
+
+          item_col <- switch(platform,
             "2" = "asin",  # Amazon
-            "3" = "ebay_product_number",  # eBay
+            "3" = "ebay_item_number",  # eBay
             "product_id"  # Default fallback
           )
           
-          if (product_col %in% names(filtered_data)) {
-            message("DEBUG: Renaming '", product_col, "' to 'product_id' in positionIdealRate")
-            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(product_col))
+          if (item_col %in% names(filtered_data)) {
+            message("DEBUG: Renaming '", item_col, "' to 'product_id' in positionIdealRate")
+            filtered_data <- filtered_data %>% dplyr::rename(product_id = !!sym(item_col))
           } else {
             warning("No product identifier column found in IdealRate position data. Available columns: ", paste(names(filtered_data), collapse = ", "))
           }
@@ -346,10 +368,12 @@ positionIdealRateServer <- function(id, app_data_connection = NULL, config = NUL
       # Define variables to exclude from analysis
       exclude_vars <- c("product_line_id", "platform_id", "rating", "sales", "revenue")
       
+      # Following MK03 principle - use cross-attribute average method
       result <- perform_ideal_rate_analysis(
         data = data,
         exclude_vars = exclude_vars,
-        threshold_multiplier = input$threshold_multiplier %||% 1.0
+        n_key_factors = 8,  # Only used if selection_method is "top_n"
+        selection_method = "cross_average"  # Use MK03 principle: I_j > mean(I)
       )
       
       if (nrow(result$ideal_analysis) > 0) {
@@ -363,8 +387,6 @@ positionIdealRateServer <- function(id, app_data_connection = NULL, config = NUL
     
     # ------------ Reset filters ------------------------------------
     observeEvent(input$reset_filters, {
-      updateSliderInput(session, "threshold_multiplier", value = 1.0)
-      updateSliderInput(session, "max_rows", value = 50)
       updateCheckboxInput(session, "show_all_columns", value = FALSE)
       
       message("Ideal Rate settings reset")
@@ -381,12 +403,6 @@ positionIdealRateServer <- function(id, app_data_connection = NULL, config = NUL
       
       # Prepare data for display
       display_data <- result$ideal_analysis
-      
-      # Limit number of rows
-      max_rows <- input$max_rows %||% 50
-      if (nrow(display_data) > max_rows) {
-        display_data <- display_data[1:max_rows, ]
-      }
       
       # Select columns based on display options
       if (input$show_all_columns %||% FALSE) {
@@ -413,19 +429,30 @@ positionIdealRateServer <- function(id, app_data_connection = NULL, config = NUL
     
     # Display component status
     output$component_status <- renderText({
-      if (product_line_id() == "all") {
-        return("Please select a specific product line for ideal rate analysis")
+      # MP031: Defensive programming - check for NULL/empty values before switch
+      # R113: Error handling for reactive expressions
+      status_val <- tryCatch({
+        component_status()
+      }, error = function(e) {
+        warning("Error getting component status: ", e$message)
+        "idle"
+      })
+
+      # MP099: Defensive check for NULL or empty status
+      if (is.null(status_val) || length(status_val) == 0 || status_val == "") {
+        return("Ready for position analysis")
       }
-      
-      switch(component_status(),
-             idle = "Ready for ideal rate analysis",
+
+      # Ensure status_val is character and length 1 for switch
+      status_val <- as.character(status_val)[1]
+
+      switch(status_val,
+             idle = "Ready for position analysis",
              loading = "Loading position data...",
-             ready = paste0("Analysis complete with ", 
-                          nrow(ideal_rate_result()$ideal_analysis %||% data.frame()), 
-                          " products ranked"),
-             computing = "Computing ideal rate analysis...",
-             error = "Error in ideal rate analysis",
-             component_status())
+             ready = paste0("Position data loaded: ", nrow(position_data()), " records"),
+             computing = "Computing position metrics...",
+             error = "Error loading position data",
+             status_val)  # Default: return the status value itself
     })
     
     # Return reactive values for external use

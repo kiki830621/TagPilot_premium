@@ -64,27 +64,22 @@ poissonTimeAnalysisFilterUI <- function(id, translate = identity) {
       value = FALSE
     ),
     
-    # Display options
-    hr(),
-    h4(translate("顯示選項")),
-    
-    # Chart type
-    radioButtons(
-      inputId = ns("chart_type"),
-      label = translate("圖表類型"),
-      choices = list(
-        "係數圖" = "coefficient",
-        "發生率比圖" = "irr",
-        "信賴區間圖" = "confidence"
-      ),
-      selected = "irr"
-    ),
     
     # Reset button
     actionButton(
       inputId = ns("reset_filters"),
       label = translate("重置篩選"),
       class = "btn-outline-secondary btn-block mt-3"
+    ),
+    
+    hr(),
+    
+    # AI Analysis button
+    actionButton(
+      inputId = ns("generate_time_insight"),
+      label = translate("生成 AI 時段洞察"),
+      class = "btn-primary btn-block mt-3",
+      icon = icon("magic")
     ),
     
     hr(),
@@ -161,14 +156,23 @@ poissonTimeAnalysisDisplayUI <- function(id, translate = identity) {
             DTOutput(ns("time_analysis_table"), width = "100%")
           ),
           
-          # Model diagnostics
+          # AI Insights
           tabPanel(
-            title = translate("模型診斷"),
-            value = "diagnostics",
+            title = translate("AI 時段洞察"),
+            value = "ai_insights",
             br(),
-            fluidRow(
-              column(6, plotly::plotlyOutput(ns("aic_distribution_plot"), height = "400px")),
-              column(6, plotly::plotlyOutput(ns("convergence_status_plot"), height = "400px"))
+            div(
+              class = "ai-insights-container",
+              style = "min-height: 300px; padding: 20px; background-color: #f8f9fa; border-radius: 8px;",
+              if (requireNamespace("shinycssloaders", quietly = TRUE)) {
+                shinycssloaders::withSpinner(
+                  htmlOutput(ns("time_insight_output")),
+                  type = 6,
+                  color = "#0d6efd"
+                )
+              } else {
+                htmlOutput(ns("time_insight_output"))
+              }
             )
           )
         ))
@@ -262,8 +266,9 @@ poissonTimeAnalysisServer <- function(id, app_data_connection = NULL, config = N
           return(data.frame())
         }
         
-        # Get platform
-        platform <- platform_id()
+        # Get platform - 時間分析固定使用 Cyberbiz 資料
+        # platform <- platform_id()
+        platform <- "cbz"  # 固定使用 Cyberbiz，因為只有 Cyberbiz 有時間區段資料
         
         # Access Poisson analysis results using tbl2
         table_name <- paste0("df_", platform, "_poisson_analysis_all")
@@ -326,6 +331,32 @@ poissonTimeAnalysisServer <- function(id, app_data_connection = NULL, config = N
       if (input$show_significant_only) {
         data <- data %>% 
           dplyr::filter(!is.na(p_value) & p_value < 0.05 & convergence == "converged")
+      }
+      
+      # Apply covariate exclusion rules for display purposes only
+      # This preserves the full analysis but filters what users see
+      if (nrow(data) > 0) {
+        tryCatch({
+          all_predictors <- unique(data$predictor)
+          kept_predictors <- filter_covariates(
+            var_names = all_predictors,
+            app_type = "time_series_analysis",  # Use time series specific settings
+            verbose = FALSE
+          )
+          
+          # Filter data to keep only allowed predictors
+          data <- data %>%
+            dplyr::filter(predictor %in% kept_predictors)
+          
+          # Log exclusions if verbose
+          excluded_count <- length(all_predictors) - length(kept_predictors)
+          if (excluded_count > 0) {
+            message(sprintf("Hiding %d time covariates from display based on exclusion rules", excluded_count))
+          }
+        }, error = function(e) {
+          # If function not available, show all predictors
+          warning("filter_covariates not available, showing all covariates: ", e$message)
+        })
       }
       
       return(data)
@@ -396,11 +427,8 @@ poissonTimeAnalysisServer <- function(id, app_data_connection = NULL, config = N
           )
         )
       
-      # Choose y-axis based on chart type
-      y_var <- switch(input$chart_type,
-                     "coefficient" = "coefficient",
-                     "irr" = "incidence_rate_ratio", 
-                     "confidence" = "incidence_rate_ratio")
+      # 固定使用 IRR (發生率比)
+      y_var <- "incidence_rate_ratio"
       
       p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = predictor_clean, y = .data[[y_var]], 
                                                   color = product_line_id, shape = is_significant)) +
@@ -410,27 +438,14 @@ poissonTimeAnalysisServer <- function(id, app_data_connection = NULL, config = N
         ggplot2::labs(
           title = "時間因素效應分析",
           x = "時間維度",
-          y = switch(input$chart_type,
-                    "coefficient" = "回歸係數",
-                    "irr" = "發生率比 (IRR)",
-                    "confidence" = "發生率比 (IRR)"),
+          y = "發生率比 (IRR)",
           color = "產品線",
           shape = "顯著性 (p<0.05)"
         ) +
         ggplot2::scale_shape_manual(values = c(1, 16), labels = c("否", "是"))
       
-      # Add reference lines
-      if (input$chart_type == "coefficient") {
-        p <- p + ggplot2::geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.5)
-      } else {
-        p <- p + ggplot2::geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.5)
-      }
-      
-      # Add confidence intervals for confidence chart
-      if (input$chart_type == "confidence") {
-        p <- p + ggplot2::geom_errorbar(ggplot2::aes(ymin = irr_conf_low, ymax = irr_conf_high), 
-                                       width = 0.2, alpha = 0.6)
-      }
+      # Add reference line for IRR = 1
+      p <- p + ggplot2::geom_hline(yintercept = 1, linetype = "dashed", alpha = 0.5)
       
       plotly::ggplotly(p, tooltip = c("x", "y", "colour", "shape"))
     })
@@ -665,24 +680,174 @@ poissonTimeAnalysisServer <- function(id, app_data_connection = NULL, config = N
       updateCheckboxGroupInput(session, "time_dimensions", 
                              selected = c("year", "monthly", "day", "weekday"))
       updateCheckboxInput(session, "show_significant_only", value = FALSE)
-      updateRadioButtons(session, "chart_type", selected = "irr")
     })
     
     # Component status
     output$component_status <- renderText({
-      switch(component_status(),
+      # MP031: Defensive programming - check for NULL/empty values before switch
+      # R113: Error handling for reactive expressions
+      status_val <- tryCatch({
+        component_status()
+      }, error = function(e) {
+        warning("Error getting component status: ", e$message)
+        "idle"
+      })
+
+      # MP099: Defensive check for NULL or empty status
+      if (is.null(status_val) || length(status_val) == 0 || status_val == "") {
+        return("準備顯示時間分析")
+      }
+
+      # Ensure status_val is character and length 1 for switch
+      status_val <- as.character(status_val)[1]
+
+      switch(status_val,
              idle = "準備顯示時間分析",
              loading = "載入分析資料中...",
              ready = paste0("已載入 ", nrow(poisson_data()), " 筆時間分析結果"),
              error = "載入資料時發生錯誤",
-             component_status())
+             status_val)  # Default: return the status value itself
+    })
+    
+    # ------------ AI Time Insights Generation ----------------------------
+    ai_insight_result <- reactiveVal(NULL)
+    
+    # Get OpenAI API key from environment
+    gpt_key <- Sys.getenv("OPENAI_API_KEY", "")
+    if (!nzchar(gpt_key)) {
+      gpt_key <- NULL
+    }
+    
+    observeEvent(input$generate_time_insight, {
+      data <- filtered_data()
+      
+      if (is.null(data) || nrow(data) == 0) {
+        showNotification("無可用的時間分析資料", type = "warning")
+        return()
+      }
+      
+      if (is.null(gpt_key)) {
+        showNotification("OpenAI API 金鑰未設定。AI 分析功能已停用。", type = "error")
+        return()
+      }
+      
+      withProgress(message = "生成時段驅動力洞察中...", value = 0, {
+        incProgress(0.2, detail = "準備資料...")
+        
+        # Prepare time effect data for AI analysis
+        # Focus on significant monthly and weekday effects
+        monthly_data <- data %>%
+          dplyr::filter(grepl("^month_", predictor) & !is.na(incidence_rate_ratio)) %>%
+          dplyr::mutate(
+            month_num = as.numeric(gsub("month_", "", predictor)),
+            month_name = month.abb[month_num],
+            effect_strength = round(incidence_rate_ratio, 2),
+            is_significant = !is.na(p_value) & p_value < 0.05
+          ) %>%
+          dplyr::filter(is_significant) %>%
+          dplyr::arrange(desc(incidence_rate_ratio)) %>%
+          dplyr::select(month_name, effect_strength)
+        
+        weekday_data <- data %>%
+          dplyr::filter(predictor %in% c("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday") &
+                 !is.na(incidence_rate_ratio)) %>%
+          dplyr::mutate(
+            weekday_chinese = dplyr::recode(predictor, 
+              "monday" = "週一", "tuesday" = "週二", "wednesday" = "週三",
+              "thursday" = "週四", "friday" = "週五", "saturday" = "週六", "sunday" = "週日"),
+            effect_strength = round(incidence_rate_ratio, 2),
+            is_significant = !is.na(p_value) & p_value < 0.05
+          ) %>%
+          dplyr::filter(is_significant) %>%
+          dplyr::arrange(desc(incidence_rate_ratio)) %>%
+          dplyr::select(weekday_chinese, effect_strength)
+        
+        incProgress(0.4, detail = "分析時間效應...")
+        
+        # Convert to JSON for GPT
+        time_effects <- list(
+          monthly_effects = if(nrow(monthly_data) > 0) {
+            setNames(as.list(monthly_data$effect_strength), monthly_data$month_name)
+          } else list(),
+          weekday_effects = if(nrow(weekday_data) > 0) {
+            setNames(as.list(weekday_data$effect_strength), weekday_data$weekday_chinese)
+          } else list()
+        )
+        
+        effects_json <- jsonlite::toJSON(time_effects, auto_unbox = TRUE)
+        
+        incProgress(0.6, detail = "呼叫 AI 分析...")
+        
+        # OpenAI functions should already be loaded from union_production_test.R
+        if (!exists("fn_chat_api")) {
+          stop("OpenAI functions not loaded. Please check union_production_test.R initialization.")
+        }
+        
+        # Create prompt
+        sys <- list(role = "system", content = "你是專業的電商數據分析師，擅長時間序列分析和銷售策略。請用繁體中文回答。")
+        usr <- list(
+          role = "user",
+          content = paste0(
+            "根據以下時間效應分析數據，提供時段驅動力洞察報告。",
+            "\n\n## 時間效應數據（發生率比 Incidence Ratio）：",
+            "\n", effects_json,
+            "\n\n請按以下格式輸出：",
+            "\n\n### 🕐 時段驅動力洞察",
+            "\n\n#### 1. 正向影響銷售的關鍵時段",
+            "\n列出效應值 > 1.2 的月份和星期，並說明銷售倍數。",
+            "\n\n#### 2. 關鍵字廣告投放建議",
+            "\n針對高峰時段，建議 3-5 個適合的關鍵字組合（如：開罐器 不鏽鋼、廚房用品 省力）。",
+            "\n\n#### 3. 出價策略建議",
+            "\n根據時段效應強度，提供具體的競價調整百分比建議。",
+            "\n\n#### 4. 促銷活動建議",
+            "\n結合時段特性，建議適合的促銷方式（如：Lightning Deal、Coupon、Subscribe & Save）。",
+            "\n\n**注意**：",
+            "\n- 保持專業但易懂的語言",
+            "\n- 提供具體可執行的建議",
+            "\n- 限制在 400 字內"
+          )
+        )
+        
+        incProgress(0.8, detail = "處理 AI 回應...")
+        
+        txt <- fn_chat_api(list(sys, usr), gpt_key)
+        
+        incProgress(0.9, detail = "完成分析...")
+        
+        ai_insight_result(txt)
+        
+        # Switch to AI insights tab
+        updateTabsetPanel(session, "analysis_tabs", selected = "ai_insights")
+        
+        incProgress(1.0, detail = "分析完成！")
+      })
+    })
+    
+    # Render AI insights
+    output$time_insight_output <- renderUI({
+      txt <- ai_insight_result()
+      
+      if (is.null(txt)) {
+        return(HTML("<i style='color:gray;'>點擊「生成 AI 時段洞察」按鈕，獲得基於時間效應的銷售策略建議。</i>"))
+      }
+      
+      # Clean and convert to HTML
+      res <- fn_strip_code_fence(txt)
+      if (requireNamespace("markdown", quietly = TRUE)) {
+        html <- markdown::markdownToHTML(text = res, fragment.only = TRUE)
+        HTML(html)
+      } else {
+        # Fallback
+        HTML(paste0("<pre>", res, "</pre>"))
+      }
     })
     
     # Return reactive values
     return(list(
       poisson_data = poisson_data,
       filtered_data = filtered_data,
-      component_status = component_status
+      component_status = component_status,
+      ai_insight_result = ai_insight_result
     ))
   })
 }

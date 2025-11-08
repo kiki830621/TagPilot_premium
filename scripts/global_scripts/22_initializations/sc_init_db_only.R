@@ -32,7 +32,7 @@ source_file <- function(file_path) {
 }
 
 # Source database functions
-source_file(file.path(db_utils_dir, "fn_get_default_db_paths.R"))
+source_file(file.path(db_utils_dir, "duckdb", "fn_get_default_db_paths.R"))
 source_file(file.path(db_utils_dir, "fn_dbConnect_from_list.R"))
 
 # Initialize database paths
