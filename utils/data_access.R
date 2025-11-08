@@ -8,8 +8,8 @@ source("scripts/global_scripts/02_db_utils/tbl2/fn_tbl2.R")  # 增強資料存�
 source("scripts/global_scripts/04_utils/fn_import_csvxlsx.R")  # 檔案匯入工具
 source("scripts/global_scripts/04_utils/fn_clean_column_names.R")  # 欄位名稱清理
 source("scripts/global_scripts/04_utils/fn_handle_na.R")  # NA 值處理
-source("scripts/global_scripts/04_utils/safe_get.R")  # 安全取值
-source("scripts/global_scripts/04_utils/remove_na_strings.R")  # 移除 NA 字串
+source("scripts/global_scripts/04_utils/fn_safe_get.R")  # 安全取值
+source("scripts/global_scripts/04_utils/fn_remove_na_strings.R")  # 移除 NA 字串
 
 # 載入數據庫連接模組（包含跨數據庫兼容函數）
 source("database/db_connection.R")
