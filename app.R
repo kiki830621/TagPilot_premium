@@ -567,23 +567,39 @@ server <- function(input, output, session) {
   # 設定檔案上傳大小限制為 200MB
   options(shiny.maxRequestSize = 200*1024^2)
 
-  con_global   <- get_con()
-  db_info <- get_db_info(con_global)  # 取得資料庫連接資訊
-  onStop(function() dbDisconnect(con_global))
+  # 資料庫連接（連接但不初始化表格）
+  con_global <- get_con()
+  onStop(function() {
+    if (!is.null(con_global) && dbIsValid(con_global)) {
+      dbDisconnect(con_global)
+    }
+  })
 
-  # 全域 reactive 物件
+  # 反應式變數
   user_info    <- reactiveVal(NULL)   # 登入後的 user row
-
   sales_data   <- reactiveVal(NULL)   # 銷售資料
+  db_initialized <- reactiveVal(FALSE)  # 資料表初始化狀態
 
   # 設定資源路徑
   images_path <- if (dir.exists("www/images")) "www/images" else "www"
   addResourcePath("images", images_path)
 
-  # 登入模組
-  login_mod <- loginModuleServer("login1", con_global)
+  # 登入模組（不傳遞連接，讓模組內部使用 db_query 和 db_execute）
+  login_mod <- loginModuleServer("login1")
+
   observe({
     user_info(login_mod$user_info())
+
+    # 登入成功後初始化資料表
+    if (!is.null(user_info()) && !db_initialized()) {
+      tryCatch({
+        init_tables(con_global)
+        db_initialized(TRUE)
+        showNotification("✅ 資料庫初始化完成", type = "message")
+      }, error = function(e) {
+        showNotification(paste("資料庫初始化失敗:", e$message), type = "error")
+      })
+    }
   })
 
   # 上傳模組
