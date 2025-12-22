@@ -209,16 +209,62 @@ customerBaseValueServer <- function(id, dna_results) {
       # 計算百分位數
       p80 <- quantile(df_with_ipt$ipt_mean, 0.8, na.rm = TRUE)
       p20 <- quantile(df_with_ipt$ipt_mean, 0.2, na.rm = TRUE)
-      
-      # 分群
-      df_with_ipt <- df_with_ipt %>%
-        mutate(
-          purchase_cycle_level = case_when(
-            ipt_mean >= p80 ~ "高購買週期",
-            ipt_mean >= p20 ~ "中購買週期",
-            TRUE ~ "低購買週期"
+      ipt_min <- min(df_with_ipt$ipt_mean, na.rm = TRUE)
+      ipt_max <- max(df_with_ipt$ipt_mean, na.rm = TRUE)
+
+      # 分群（處理邊界情況以確保三群都存在）
+      if (p20 == ipt_min) {
+        # P20 = 最小值：會缺少「低」群，需要特殊處理
+        # 強制最底部 20% 為「低」
+        df_with_ipt <- df_with_ipt %>%
+          arrange(ipt_mean) %>%
+          mutate(
+            rank_val = row_number(),
+            purchase_cycle_level = case_when(
+              rank_val <= ceiling(n() * 0.2) ~ "低購買週期",
+              ipt_mean >= p80 ~ "高購買週期",
+              TRUE ~ "中購買週期"
+            )
+          ) %>%
+          select(-rank_val)
+      } else if (p80 == ipt_max) {
+        # P80 = 最大值：會缺少「高」群，需要特殊處理
+        # 強制最頂部 20% 為「高」
+        df_with_ipt <- df_with_ipt %>%
+          arrange(desc(ipt_mean)) %>%
+          mutate(
+            rank_val = row_number(),
+            purchase_cycle_level = case_when(
+              rank_val <= ceiling(n() * 0.2) ~ "高購買週期",
+              ipt_mean < p20 ~ "低購買週期",
+              TRUE ~ "中購買週期"
+            )
+          ) %>%
+          select(-rank_val)
+      } else if (abs(ipt_max - ipt_min) < 0.01 || p20 == p80) {
+        # 所有值相同或太接近，強制分成三等份
+        df_with_ipt <- df_with_ipt %>%
+          arrange(ipt_mean) %>%
+          mutate(
+            rank_val = row_number(),
+            purchase_cycle_level = case_when(
+              rank_val <= ceiling(n() * 0.2) ~ "低購買週期",
+              rank_val <= ceiling(n() * 0.8) ~ "中購買週期",
+              TRUE ~ "高購買週期"
+            )
+          ) %>%
+          select(-rank_val)
+      } else {
+        # 正常情況：使用 P20/P80 分位數
+        df_with_ipt <- df_with_ipt %>%
+          mutate(
+            purchase_cycle_level = case_when(
+              ipt_mean >= p80 ~ "高購買週期",
+              ipt_mean >= p20 ~ "中購買週期",
+              TRUE ~ "低購買週期"
+            )
           )
-        )
+      }
       
       # 統計
       summary_data <- df_with_ipt %>%
@@ -317,16 +363,62 @@ customerBaseValueServer <- function(id, dna_results) {
       # 計算百分位數
       p80 <- quantile(df_with_m$m_value, 0.8, na.rm = TRUE)
       p20 <- quantile(df_with_m$m_value, 0.2, na.rm = TRUE)
-      
-      # 分群
-      df_with_m <- df_with_m %>%
-        mutate(
-          past_value_level = case_when(
-            m_value >= p80 ~ "高價值顧客",
-            m_value >= p20 ~ "中價值顧客",
-            TRUE ~ "低價值顧客"
+      m_min <- min(df_with_m$m_value, na.rm = TRUE)
+      m_max <- max(df_with_m$m_value, na.rm = TRUE)
+
+      # 分群（處理邊界情況以確保三群都存在）
+      if (p20 == m_min) {
+        # P20 = 最小值：會缺少「低」群，需要特殊處理
+        # 強制最底部 20% 為「低」
+        df_with_m <- df_with_m %>%
+          arrange(m_value) %>%
+          mutate(
+            rank_val = row_number(),
+            past_value_level = case_when(
+              rank_val <= ceiling(n() * 0.2) ~ "低價值顧客",
+              m_value >= p80 ~ "高價值顧客",
+              TRUE ~ "中價值顧客"
+            )
+          ) %>%
+          select(-rank_val)
+      } else if (p80 == m_max) {
+        # P80 = 最大值：會缺少「高」群，需要特殊處理
+        # 強制最頂部 20% 為「高」
+        df_with_m <- df_with_m %>%
+          arrange(desc(m_value)) %>%
+          mutate(
+            rank_val = row_number(),
+            past_value_level = case_when(
+              rank_val <= ceiling(n() * 0.2) ~ "高價值顧客",
+              m_value < p20 ~ "低價值顧客",
+              TRUE ~ "中價值顧客"
+            )
+          ) %>%
+          select(-rank_val)
+      } else if (abs(m_max - m_min) < 0.01 || p20 == p80) {
+        # 所有值相同或太接近，強制分成三等份
+        df_with_m <- df_with_m %>%
+          arrange(m_value) %>%
+          mutate(
+            rank_val = row_number(),
+            past_value_level = case_when(
+              rank_val <= ceiling(n() * 0.2) ~ "低價值顧客",
+              rank_val <= ceiling(n() * 0.8) ~ "中價值顧客",
+              TRUE ~ "高價值顧客"
+            )
+          ) %>%
+          select(-rank_val)
+      } else {
+        # 正常情況：使用 P20/P80 分位數
+        df_with_m <- df_with_m %>%
+          mutate(
+            past_value_level = case_when(
+              m_value >= p80 ~ "高價值顧客",
+              m_value >= p20 ~ "中價值顧客",
+              TRUE ~ "低價值顧客"
+            )
           )
-        )
+      }
       
       # 統計
       summary_data <- df_with_m %>%

@@ -38,9 +38,9 @@ lifecyclePredictionUI <- function(id) {
     conditionalPanel(
       condition = paste0("output['", ns("data_ready"), "'] == true"),
 
-      # 預測關鍵指標
+      # 預測關鍵指標 (Issue #8: 移除平均預測天數)
       fluidRow(
-        column(4,
+        column(6,
           bs4Card(
             title = "平均預測購買金額",
             status = "success",
@@ -52,19 +52,20 @@ lifecyclePredictionUI <- function(id) {
             )
           )
         ),
-        column(4,
-          bs4Card(
-            title = "平均預測天數",
-            status = "info",
-            solidHeader = TRUE,
-            width = 12,
-            div(style = "text-align: center; padding: 20px;",
-              h2(textOutput(ns("avg_predicted_days")), style = "color: #17a2b8; margin: 0;"),
-              p("天後", style = "color: #6c757d;")
-            )
-          )
-        ),
-        column(4,
+        # Issue #8: 移除「平均預測天數」(邏輯不好解釋)
+        # column(4,
+        #   bs4Card(
+        #     title = "平均預測天數",
+        #     status = "info",
+        #     solidHeader = TRUE,
+        #     width = 12,
+        #     div(style = "text-align: center; padding: 20px;",
+        #       h2(textOutput(ns("avg_predicted_days")), style = "color: #17a2b8; margin: 0;"),
+        #       p("天後", style = "color: #6c757d;")
+        #     )
+        #   )
+        # ),
+        column(6,
           bs4Card(
             title = "高信心度預測客戶",
             status = "warning",
@@ -121,7 +122,40 @@ lifecyclePredictionUI <- function(id) {
             status = "primary",
             solidHeader = TRUE,
             width = 12,
-            plotlyOutput(ns("prediction_vs_history"), height = "450px")
+            plotlyOutput(ns("prediction_vs_history"), height = "450px"),
+            footer = div(
+              style = "padding: 10px; background-color: #f8f9fa; border-top: 1px solid #dee2e6;",
+              tags$small(
+                icon("info-circle"),
+                " ",
+                strong("圖表說明："),
+                br(),
+                "• ",
+                strong("X軸："),
+                "歷史平均消費金額（M值）｜",
+                strong("Y軸："),
+                "預測下次購買金額｜",
+                strong("氣泡大小："),
+                "購買次數（ni）",
+                br(),
+                "• ",
+                strong("顏色代表預測信心度："),
+                tags$span(style = "color: #28a745; font-weight: bold;", "■ 綠色"),
+                "（≥4次購買，高信心度）、",
+                tags$span(style = "color: #ffc107; font-weight: bold;", "■ 黃色"),
+                "（2-3次購買，中信心度）、",
+                tags$span(style = "color: #dc3545; font-weight: bold;", "■ 紅色"),
+                "（1次購買，低信心度）",
+                br(),
+                "• ",
+                strong("篩選條件："),
+                "顯示所有有預測金額且歷史消費金額 > 0 的客戶（包含僅購買 1 次的新客）",
+                br(),
+                "• ",
+                strong("採樣策略："),
+                "若客戶數 > 2000，優先保留所有重複購買客戶（ni≥2），再從新客中隨機採樣至 2000 筆；若客戶數介於 500-2000，隨機採樣 500 筆"
+              )
+            )
           )
         )
       ),
@@ -214,16 +248,17 @@ lifecyclePredictionServer <- function(id, customer_data) {
       format(round(avg_val, 0), big.mark = ",")
     })
 
-    output$avg_predicted_days <- renderText({
-      req(values$processed_data)
-      # 計算預測日期與今天的天數差
-      today <- Sys.Date()
-      avg_days <- mean(
-        as.numeric(difftime(values$processed_data$tag_031_next_purchase_date, today, units = "days")),
-        na.rm = TRUE
-      )
-      format(round(avg_days, 1), big.mark = ",")
-    })
+    # Issue #8: 移除平均預測天數（邏輯不好解釋）
+    # output$avg_predicted_days <- renderText({
+    #   req(values$processed_data)
+    #   # 計算預測日期與今天的天數差
+    #   today <- Sys.Date()
+    #   avg_days <- mean(
+    #     as.numeric(difftime(values$processed_data$tag_031_next_purchase_date, today, units = "days")),
+    #     na.rm = TRUE
+    #   )
+    #   format(round(avg_days, 1), big.mark = ",")
+    # })
 
     output$high_confidence_count <- renderText({
       req(values$processed_data)
@@ -332,21 +367,59 @@ lifecyclePredictionServer <- function(id, customer_data) {
     output$prediction_vs_history <- renderPlotly({
       req(values$processed_data)
 
-      # 準備資料：只顯示有完整資料的客戶
+      # ✅ 修正：準備資料，顯示所有有預測金額的客戶
+      # 放寬過濾條件，只要有預測金額和歷史消費金額即可
       scatter_data <- values$processed_data %>%
         filter(
-          !is.na(tag_030_next_purchase_amount),
-          !is.na(tag_011_rfm_m),
-          ni > 0
+          !is.na(tag_030_next_purchase_amount),  # 必須有預測金額
+          !is.na(tag_011_rfm_m),                 # 必須有歷史消費金額
+          tag_030_next_purchase_amount > 0,      # 預測金額必須 > 0（避免顯示異常值）
+          tag_011_rfm_m > 0                      # 歷史金額必須 > 0（避免顯示異常值）
         )
 
-      # 如果資料太多，採樣顯示
-      if (nrow(scatter_data) > 500) {
-        scatter_data <- scatter_data %>%
-          sample_n(500)
+      # 詳細診斷輸出
+      total_customers <- nrow(values$processed_data)
+      has_prediction <- sum(!is.na(values$processed_data$tag_030_next_purchase_amount))
+      has_both <- sum(!is.na(values$processed_data$tag_030_next_purchase_amount) &
+                      !is.na(values$processed_data$tag_011_rfm_m))
+      final_count <- nrow(scatter_data)
+
+      cat(sprintf("預測金額散點圖資料檢查:\n"))
+      cat(sprintf("  原始客戶總數: %d 筆\n", total_customers))
+      cat(sprintf("  有預測金額: %d 筆 (%.1f%%)\n",
+                  has_prediction, has_prediction/total_customers*100))
+      cat(sprintf("  同時有預測金額和歷史金額: %d 筆 (%.1f%%)\n",
+                  has_both, has_both/total_customers*100))
+      cat(sprintf("  過濾異常值後: %d 筆 (%.1f%%)\n",
+                  final_count, final_count/total_customers*100))
+
+      # 分析 ni 分布
+      if (final_count > 0) {
+        ni_dist <- scatter_data %>%
+          count(ni) %>%
+          arrange(desc(n))
+        cat(sprintf("  購買次數分布（前5名）:\n"))
+        for (i in 1:min(5, nrow(ni_dist))) {
+          cat(sprintf("    ni=%d: %d 筆 (%.1f%%)\n",
+                      ni_dist$ni[i], ni_dist$n[i], ni_dist$n[i]/final_count*100))
+        }
       }
 
-      # 建立信心度分類
+      # 如果沒有資料，顯示提示
+      if (nrow(scatter_data) == 0) {
+        return(plotly_empty() %>%
+          layout(
+            title = "無可用預測資料",
+            annotations = list(
+              x = 0.5, y = 0.5,
+              text = "所有客戶的預測金額資料不足\n請確認客戶有足夠的購買記錄",
+              showarrow = FALSE,
+              font = list(size = 16)
+            )
+          ))
+      }
+
+      # 建立信心度分類（在採樣之前，用於分層採樣）
       scatter_data <- scatter_data %>%
         mutate(
           confidence = case_when(
@@ -355,6 +428,37 @@ lifecyclePredictionServer <- function(id, customer_data) {
             TRUE ~ "低（1次）"
           )
         )
+
+      # 如果資料太多，使用分層採樣確保各信心度層級都有代表
+      original_count <- nrow(scatter_data)
+      if (original_count > 2000) {
+        # 對於超大數據集，使用分層採樣
+        # 確保高價值客戶（ni>=2）都被包含，然後從 ni=1 中隨機採樣
+        high_value <- scatter_data %>% filter(ni >= 2)
+        low_value <- scatter_data %>% filter(ni == 1)
+
+        # 如果高價值客戶超過 1000，採樣到 1000
+        if (nrow(high_value) > 1000) {
+          high_value <- high_value %>% sample_n(1000)
+        }
+
+        # 從低價值客戶中採樣補足到 2000
+        remaining_slots <- 2000 - nrow(high_value)
+        if (nrow(low_value) > remaining_slots) {
+          low_value <- low_value %>% sample_n(remaining_slots)
+        }
+
+        scatter_data <- bind_rows(high_value, low_value)
+        cat(sprintf("  分層採樣顯示: %d 筆（原始 %s 筆）\n",
+                    nrow(scatter_data), format(original_count, big.mark = ",")))
+        cat(sprintf("    - ni≥2: %d 筆\n", nrow(high_value)))
+        cat(sprintf("    - ni=1: %d 筆\n", nrow(low_value)))
+      } else if (original_count > 500) {
+        # 中等數據集，簡單隨機採樣
+        scatter_data <- scatter_data %>%
+          sample_n(500)
+        cat(sprintf("  隨機採樣顯示: 500 筆（原始 %d 筆）\n", original_count))
+      }
 
       # 顏色映射
       color_map <- c(

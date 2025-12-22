@@ -78,17 +78,30 @@ customerStatusUI <- function(id) {
         )
       ),
 
-      # PDF需求 #5.6: 預估流失天數分布（更清楚的說明）
+      # PDF需求 #5.6: 預估流失天數分布（改為兩張圖）
       fluidRow(
         column(6,
           bs4Card(
-            title = "預估流失天數分布｜橫軸：預測多少天後｜縱軸：會流失多少客戶數",
+            title = "流失狀態分布",
+            status = "warning",
+            solidHeader = TRUE,
+            width = 12,
+            plotlyOutput(ns("churn_status_pie"), height = "350px")
+          )
+        ),
+        column(6,
+          bs4Card(
+            title = "預估流失天數分布（未流失客戶）",
             status = "danger",
             solidHeader = TRUE,
             width = 12,
             plotlyOutput(ns("days_to_churn_hist"), height = "350px")
           )
-        ),
+        )
+      ),
+
+      # 統計指標區塊
+      fluidRow(
         column(6,
           bs4Card(
             title = "關鍵統計指標",
@@ -148,13 +161,18 @@ customerStatusUI <- function(id) {
                   )
                 )
               ),
-              # Row 4: 平均流失風險天數
+              # Row 4: 平均流失風險天數（改進說明）
               fluidRow(
                 column(12,
                   div(style = "text-align: center; border-top: 1px solid #dee2e6; padding-top: 15px;",
-                    h5("平均流失風險天數", style = "color: #e83e8c; margin-bottom: 5px;"),
+                    h5("平均預估流失天數", style = "color: #e83e8c; margin-bottom: 5px;"),
                     h3(textOutput(ns("avg_days_to_churn")), style = "color: #e83e8c; margin: 5px 0;"),
-                    p("天", style = "color: #6c757d; font-size: 0.9em;")
+                    p("天", style = "color: #6c757d; font-size: 0.9em;"),
+                    p(style = "color: #6c757d; font-size: 0.8em; margin-top: 5px;",
+                      "說明：平均多少天後客戶可能流失",
+                      tags$br(),
+                      "0 天 = 已超過預期回購時間（高風險）"
+                    )
                   )
                 )
               )
@@ -271,7 +289,16 @@ customerStatusServer <- function(id, customer_data) {
 
     output$avg_days_to_churn <- renderText({
       req(values$processed_data)
-      avg_val <- mean(values$processed_data$tag_019_days_to_churn, na.rm = TRUE)
+
+      # ✅ 修正：只計算有效資料（排除 NA 和負值）
+      valid_days <- values$processed_data$tag_019_days_to_churn
+      valid_days <- valid_days[!is.na(valid_days) & valid_days >= 0]
+
+      if (length(valid_days) == 0) {
+        return("N/A")
+      }
+
+      avg_val <- mean(valid_days)
       format(round(avg_val, 1), big.mark = ",")
     })
 
@@ -390,14 +417,20 @@ customerStatusServer <- function(id, customer_data) {
     output$lifecycle_churn_heatmap <- renderPlotly({
       req(values$processed_data)
 
-      # 計算交叉矩陣
+      # ✅ 修正：過濾有效資料並計算交叉矩陣
       heatmap_data <- values$processed_data %>%
+        filter(!is.na(tag_017_customer_dynamics), !is.na(tag_018_churn_risk)) %>%
         count(tag_017_customer_dynamics, tag_018_churn_risk) %>%
         tidyr::pivot_wider(
           names_from = tag_018_churn_risk,
           values_from = n,
           values_fill = 0
         )
+
+      # 如果沒有資料，顯示提示
+      if (nrow(heatmap_data) == 0) {
+        return(plotly_empty() %>% layout(title = "無有效資料"))
+      }
 
       # 確保有所有風險等級欄位
       for (risk in c("低", "中", "高")) {
@@ -406,64 +439,131 @@ customerStatusServer <- function(id, customer_data) {
         }
       }
 
-      # ✅ FIX: tag_017_customer_dynamics contains CHINESE values
-      # 轉換為矩陣格式 - use Chinese lifecycle stage order
+      # ✅ 新增：只顯示有資料的列（移除全為0的顧客動態）
+      heatmap_data <- heatmap_data %>%
+        mutate(row_total = `低` + `中` + `高`) %>%
+        filter(row_total > 0) %>%
+        select(-row_total)
+
+      if (nrow(heatmap_data) == 0) {
+        return(plotly_empty() %>% layout(title = "所有客戶動態資料為空"))
+      }
+
+      # 按照預定順序排列（只保留有資料的）
       lifecycle_order <- c("新客", "主力客", "睡眠客", "半睡客", "沉睡客", "未知")
       heatmap_data <- heatmap_data %>%
         filter(tag_017_customer_dynamics %in% lifecycle_order) %>%
         arrange(match(tag_017_customer_dynamics, lifecycle_order))
 
-      # 中文標籤 (already in Chinese, use directly)
-      label_map <- c(
-        "新客" = "新客",
-        "主力客" = "主力客",
-        "睡眠客" = "睡眠客",
-        "半睡客" = "半睡客",
-        "沉睡客" = "沉睡客",
-        "未知" = "未知"
-      )
+      # 建立風險等級順序
+      risk_order <- c("低", "中", "高")
 
-      heatmap_data$lifecycle_zh <- label_map[heatmap_data$tag_017_customer_dynamics]
+      # 將資料轉換為矩陣格式
+      z_matrix <- as.matrix(heatmap_data[, risk_order, drop = FALSE])
 
+      # 建立熱圖
       plot_ly(
-        data = heatmap_data,
-        x = c("低", "中", "高"),
-        y = ~lifecycle_zh,
-        z = ~as.matrix(select(heatmap_data, `低`, `中`, `高`)),
+        x = risk_order,
+        y = heatmap_data$tag_017_customer_dynamics,
+        z = z_matrix,
         type = "heatmap",
         colorscale = list(
           c(0, "rgb(255, 255, 255)"),
           c(0.5, "rgb(255, 193, 7)"),
           c(1, "rgb(220, 53, 69)")
         ),
+        text = z_matrix,
+        texttemplate = "%{text}",
+        textfont = list(size = 14, color = "black"),
         hovertemplate = "顧客動態: %{y}<br>流失風險: %{x}<br>客戶數: %{z}<extra></extra>",
         showscale = TRUE
       ) %>%
         layout(
-          xaxis = list(title = "流失風險等級"),
-          yaxis = list(title = "顧客動態"),
+          xaxis = list(title = "流失風險等級", side = "bottom"),
+          yaxis = list(title = "顧客動態", autorange = "reversed"),
           title = ""
         )
     })
 
     # ==========================================================================
-    # 預估流失天數分布圖
+    # 流失狀態圓餅圖（新增）
+    # ==========================================================================
+
+    output$churn_status_pie <- renderPlotly({
+      req(values$processed_data)
+
+      # ✅ 計算已流失 vs 未流失客戶數
+      churn_status <- values$processed_data %>%
+        filter(!is.na(tag_019_days_to_churn)) %>%
+        mutate(
+          status = case_when(
+            tag_019_days_to_churn == 0 ~ "已流失（0天）",
+            tag_019_days_to_churn > 0 ~ "未流失",
+            TRUE ~ "未知"
+          )
+        ) %>%
+        count(status) %>%
+        mutate(pct = round(n / sum(n) * 100, 1))
+
+      if (nrow(churn_status) == 0) {
+        return(plotly_empty() %>% layout(title = "無有效資料"))
+      }
+
+      # 定義顏色
+      colors <- c(
+        "已流失（0天）" = "#dc3545",
+        "未流失" = "#28a745",
+        "未知" = "#6c757d"
+      )
+
+      plot_ly(
+        data = churn_status,
+        labels = ~status,
+        values = ~n,
+        type = "pie",
+        marker = list(colors = ~colors[status]),
+        textinfo = "label+percent",
+        hovertemplate = "%{label}<br>客戶數: %{value}<br>佔比: %{percent}<extra></extra>"
+      ) %>%
+        layout(
+          showlegend = TRUE,
+          title = ""
+        )
+    })
+
+    # ==========================================================================
+    # 預估流失天數分布圖（只顯示未流失客戶）
     # ==========================================================================
 
     output$days_to_churn_hist <- renderPlotly({
       req(values$processed_data)
 
-      plot_ly(
-        x = values$processed_data$tag_019_days_to_churn,
-        type = "histogram",
-        marker = list(color = "#dc3545"),
-        nbinsx = 30
-      ) %>%
-        layout(
-          xaxis = list(title = "預測多少天後"),
-          yaxis = list(title = "會流失多少客戶數"),
-          title = ""
-        )
+      # ✅ 修正：只顯示未流失客戶（天數 > 0）
+      valid_data <- values$processed_data %>%
+        filter(!is.na(tag_019_days_to_churn), tag_019_days_to_churn > 0)
+
+      # 如果沒有有效資料，顯示提示
+      if (nrow(valid_data) == 0) {
+        plotly_empty() %>%
+          layout(title = "無未流失客戶資料")
+      } else {
+        plot_ly(
+          x = valid_data$tag_019_days_to_churn,
+          type = "histogram",
+          marker = list(color = "#ffc107"),
+          nbinsx = 30,
+          hovertemplate = "天數: %{x}<br>客戶數: %{y}<extra></extra>"
+        ) %>%
+          layout(
+            xaxis = list(
+              title = "預估多少天後會流失",
+              tickformat = "d"
+            ),
+            yaxis = list(title = "客戶數"),
+            title = "",
+            showlegend = FALSE
+          )
+      }
     })
 
     # ==========================================================================
@@ -482,15 +582,22 @@ customerStatusServer <- function(id, customer_data) {
         select(
           customer_id,
           購買次數 = ni,
-          顧客動態 = tag_017_customer_dynamics,  # ✅ Use directly (already in Chinese)
+          顧客動態 = tag_017_customer_dynamics,
           流失風險 = tag_018_churn_risk,
           預估流失天數 = tag_019_days_to_churn
         ) %>%
         arrange(預估流失天數) %>%
         head(100)  # 只顯示前 100 筆
 
-      # 格式化數值
-      display_data$預估流失天數 <- round(display_data$預估流失天數, 1)
+      # ✅ 修正：將 0 天顯示為「已流失」
+      display_data <- display_data %>%
+        mutate(
+          預估流失天數 = case_when(
+            is.na(預估流失天數) ~ "N/A",
+            預估流失天數 == 0 ~ "已流失",
+            TRUE ~ as.character(round(預估流失天數, 1))
+          )
+        )
 
       datatable(
         display_data,

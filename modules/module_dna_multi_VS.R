@@ -848,10 +848,10 @@ dnaMultiModuleServer <- function(id, con, user_info, uploaded_dna_data = NULL) {
         convert_values <- !is.null(input$convert_to_text) && input$convert_to_text
         
         if (convert_values) {
-          # 轉換為高中低文字
+          # ✅ 需求 #2: 使用 P20/P80 (80/20法則) 統一分群標準
           for (col in c("r_value", "f_value", "m_value", "ipt_mean", "pcv", "clv")) {
             if (col %in% names(data) && is.numeric(data[[col]])) {
-              quantiles <- quantile(data[[col]], c(0.33, 0.67), na.rm = TRUE)
+              quantiles <- quantile(data[[col]], c(0.20, 0.80), na.rm = TRUE)
               data[[col]] <- factor(
                 ifelse(data[[col]] <= quantiles[1], "低",
                        ifelse(data[[col]] <= quantiles[2], "中", "高")),

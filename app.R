@@ -4,10 +4,33 @@
 # 更新: 2024-06-23                                                            #
 ###############################################################################
 
-# ROS 框架對應：
-# Risk (R): 基於 nrec_prob（流失機率）
-# Opportunity (O): 基於 ipt_mean（購買間隔時間）
-# Stability (S): 基於 cri（Customer Regularity Index）
+# RSV 框架對應 (v3.0 - 2025-12-03 更新)：
+# =====================================================================
+# TagPilot Premium 現在使用與 MAMBA (L4) 相同的 RSV 真實變數！
+#
+# analysis_dna() 輸出的 RSV 變數（優先使用）：
+#   R (Risk/靜止風險): nrec_prob（邏輯回歸預測流失機率 0-1）
+#     - nrec_prob > 0.7 → 高靜止戶（即將或已經流失）
+#     - nrec_prob 0.3-0.7 → 中靜止戶（互動減少但仍有潛力）
+#     - nrec_prob < 0.3 → 低靜止戶（穩定活躍群）
+#
+#   S (Stability/交易穩定度): cri, cri_ecdf（經驗貝氏 Customer Regularity Index）
+#     - cri 接近 0 → 高穩定顧客（固定頻率與金額）
+#     - cri 中等 → 中穩定顧客（有規律但偶爾波動）
+#     - cri 接近 1 → 低穩定顧客（購買間隔不固定）
+#
+#   V (Value/顧客終身價值): clv（PIF 函數預測未來 10 年價值）
+#     - 使用 P20/P80 分位數分群
+#
+# Fallback 變數（當 RSV 真實變數不存在時）：
+#   R: customer_dynamics → r_value 分位數
+#   S: ni（交易次數）
+#   V: total_spent → m_value * ni
+#
+# 參考文件：
+#   - documents/03_requirements/2025-12-03_rsv_framework_feasibility_analysis.md
+#   - scripts/global_scripts/04_utils/fn_analysis_dna.R
+# =====================================================================
 
 # ── 系統初始化 ──────────────────────────────────────────────────────────────
 source("config/packages.R")    # 載入套件管理
@@ -92,7 +115,7 @@ source("modules/module_customer_activity.R")        # 顧客活躍度分析 (CAI
 source("modules/module_customer_status.R")          # 客戶狀態分析
 source("modules/module_rsv_matrix.R")               # R/S/V 生命力矩陣
 source("modules/module_lifecycle_prediction.R")     # 生命週期預測
-source("modules/module_advanced_analytics.R")       # 進階分析（需歷史資料）
+# source("modules/module_advanced_analytics.R")       # 進階分析（需歷史資料）- Issue #20: 暫時隱藏
 
 # ── reactive values -----------------------------------------------------------
 facets_rv   <- reactiveVal(NULL)  # 目前 LLM 產出的 10 個屬性 (字串向量)
@@ -181,9 +204,9 @@ main_app_ui <- bs4DashPage(
         tabName = "customer_status",
         icon = icon("heartbeat")
       ),
-      # (5) 顧客價值與動態市場區隔分析 (取代 Value × Activity 九宮格)
+      # (5) 顧客市場區隔分析 (Issue #4: 縮短標題)
       bs4SidebarMenuItem(
-        text = "顧客價值與動態市場區隔分析",
+        text = "顧客市場區隔分析",
         tabName = "dna_analysis",
         icon = icon("th")
       ),
@@ -193,23 +216,24 @@ main_app_ui <- bs4DashPage(
         tabName = "base_value",
         icon = icon("coins")
       ),
-      # (7) 顧客生命週期預測 (靜止戶預測、回購時間、交易穩定度、CLV)
+      # (7) 顧客回購預測 (Issue #8: 改名)
       bs4SidebarMenuItem(
-        text = "生命週期預測",
+        text = "顧客回購預測",
         tabName = "lifecycle_pred",
         icon = icon("clock")
       ),
-      # 保留：R/S/V 生命力矩陣 & 進階分析
+      # 保留：R/S/V 生命力矩陣
       bs4SidebarMenuItem(
         text = "R/S/V 生命力矩陣",
         tabName = "rsv_matrix",
         icon = icon("cube")
       ),
-      bs4SidebarMenuItem(
-        text = "進階分析（需歷史資料）",
-        tabName = "advanced_analytics",
-        icon = icon("chart-line")
-      ),
+      # 進階分析（暫時隱藏 - Issue #20）
+      # bs4SidebarMenuItem(
+      #   text = "進階分析（需歷史資料）",
+      #   tabName = "advanced_analytics",
+      #   icon = icon("chart-line")
+      # ),
       bs4SidebarHeader("平台資訊"),
       bs4SidebarMenuItem(
         text = "關於我們",
@@ -248,12 +272,12 @@ main_app_ui <- bs4DashPage(
 
 
 
-      # 顧客價值與動態市場區隔分析（原 DNA 分析）
+      # 顧客市場區隔分析（Issue #4: 縮短標題）
       bs4TabItem(
         tabName = "dna_analysis",
         fluidRow(
           bs4Card(
-            title = "顧客價值與動態市場區隔分析",
+            title = "顧客市場區隔分析",
             status = "success",
             width = 12,
             solidHeader = TRUE,
@@ -329,7 +353,7 @@ main_app_ui <- bs4DashPage(
         )
       ),
 
-      # 生命週期預測
+      # 顧客回購預測 (Issue #8)
       bs4TabItem(
         tabName = "lifecycle_pred",
         fluidRow(
@@ -344,20 +368,20 @@ main_app_ui <- bs4DashPage(
         )
       ),
 
-      # Phase 5：進階分析
-      bs4TabItem(
-        tabName = "advanced_analytics",
-        fluidRow(
-          bs4Card(
-            title = NULL,
-            status = "info",
-            width = 12,
-            solidHeader = FALSE,
-            elevation = 3,
-            advancedAnalyticsUI("advanced_module")
-          )
-        )
-      ),
+      # Phase 5：進階分析 - Issue #20: 暫時隱藏
+      # bs4TabItem(
+      #   tabName = "advanced_analytics",
+      #   fluidRow(
+      #     bs4Card(
+      #       title = NULL,
+      #       status = "info",
+      #       width = 12,
+      #       solidHeader = FALSE,
+      #       elevation = 3,
+      #       advancedAnalyticsUI("advanced_module")
+      #     )
+      #   )
+      # ),
 
       # 關於我們頁面
       bs4TabItem(
@@ -636,11 +660,11 @@ server <- function(input, output, session) {
   # R/S/V 生命力矩陣（接收客戶狀態輸出）
   rsv_data <- rsvMatrixServer("rsv_module", status_data)
 
-  # 生命週期預測（接收R/S/V矩陣輸出）
+  # 顧客回購預測（Issue #8 - 接收R/S/V矩陣輸出）
   prediction_data <- lifecyclePredictionServer("prediction_module", rsv_data)
 
-  # 進階分析（接收生命週期預測輸出）
-  advanced_data <- advancedAnalyticsServer("advanced_module", prediction_data)
+  # 進階分析（接收生命週期預測輸出）- Issue #20: 暫時隱藏
+  # advanced_data <- advancedAnalyticsServer("advanced_module", prediction_data)
 
   # 登入狀態輸出
   output$user_logged_in <- reactive({

@@ -2,14 +2,18 @@
 # 第三列：顧客活躍度模組 (Customer Activity Index Module)
 # ============================================================================
 # Req #4.1: 新增顧客活躍度分析頁面
-# CAI (Customer Activity Index) = 購買次數 / 距離最後購買天數
-# 用於評估客戶的活躍程度
+# CAI (Customer Activity Index) = (mle - wmle) / mle
+#   mle = 最後購買間隔 (mean of last intervals)
+#   wmle = 加權平均購買間隔 (weighted mean of intervals)
+# 用於評估客戶購買間隔的變化趨勢（活躍度）
+# 僅針對交易次數 >= 4 的顧客計算（需要足夠的間隔數據）
 
 library(shiny)
 library(bs4Dash)
 library(DT)
 library(plotly)
 library(dplyr)
+library(tidyr)  # For pivot_wider in lifecycle × CAI matrix
 
 #' 顧客活躍度模組 UI
 #'
@@ -85,7 +89,22 @@ customerActivityUI <- function(id) {
       )
     ),
 
-    # === 第三列：CAI 分布圖表（兩張圖）===
+    # === 第三列：生命週期 × CAI 交叉矩陣圖 ===
+    h4("🔄 生命週期 × CAI 交叉分析", style = "margin: 30px 0 20px 0;"),
+
+    fluidRow(
+      column(12,
+        bs4Card(
+          title = "生命週期 × CAI 活躍度矩陣",
+          status = "primary",
+          solidHeader = FALSE,
+          width = 12,
+          plotlyOutput(ns("lifecycle_cai_matrix"), height = "400px")
+        )
+      )
+    ),
+
+    # === 第四列：CAI 分布圖表（兩張圖）===
     h4("📈 CAI 分布分析", style = "margin: 30px 0 20px 0;"),
 
     fluidRow(
@@ -147,35 +166,52 @@ customerActivityServer <- function(id, processed_data) {
     )
 
     # ==========================================================================
-    # 計算 CAI 和分群
+    # 使用來自 DNA 分析的 CAI 資料並進行分群
     # ==========================================================================
     observe({
       req(processed_data())
 
       tryCatch({
-        # 計算 CAI = times / r_value
-        # times = 購買次數（來自 tag_010_rfm_f）
-        # r_value = 距離最後購買天數（來自 tag_009_rfm_r）
+        # 使用 DNA 分析已經計算好的 CAI
+        # cai_value = (mle - wmle) / mle （來自 fn_analysis_dna.R）
+        # cai_ecdf = CAI 的累積分布函數值（百分位數）
 
+        # 檢查是否有 cai_value 欄位
+        if (!"cai_value" %in% names(processed_data()) && !"cai" %in% names(processed_data())) {
+          showNotification(
+            "錯誤：找不到 CAI 資料。請確認已執行 DNA 分析。",
+            type = "error",
+            duration = 10
+          )
+          return(NULL)
+        }
+
+        # 標準化欄位名稱（處理 cai 或 cai_value）
         cai_df <- processed_data() %>%
-          filter(!is.na(tag_010_rfm_f) & !is.na(tag_009_rfm_r) & tag_009_rfm_r > 0) %>%
           mutate(
-            cai = tag_010_rfm_f / tag_009_rfm_r  # CAI 計算公式
+            cai = if("cai_value" %in% names(.)) cai_value else cai,
+            cai_ecdf = if("cai_ecdf" %in% names(.)) cai_ecdf else NA_real_
           )
 
-        # 根據 CAI 值進行分群
-        # 使用三分位數切分
-        if (nrow(cai_df) > 0 && sum(!is.na(cai_df$cai)) > 0) {
-          p33 <- quantile(cai_df$cai, 0.33, na.rm = TRUE)
-          p67 <- quantile(cai_df$cai, 0.67, na.rm = TRUE)
+        # 過濾有效的 CAI 資料（僅保留 ni >= 4 的客戶）
+        # CAI 只對交易次數 >= 4 的客戶計算，其他為 NA
+        cai_df <- cai_df %>%
+          filter(!is.na(cai))
 
+        # 根據 CAI 的百分位數（cai_ecdf）進行分群
+        # 理論：
+        # - CAI > 0：購買間隔縮短 → 漸趨活躍
+        # - CAI ≈ 0：購買間隔穩定 → 穩定消費
+        # - CAI < 0：購買間隔拉長 → 漸趨靜止
+        # 使用 cai_ecdf (P20/P80) 分群
+        if (nrow(cai_df) > 0 && sum(!is.na(cai_df$cai_ecdf)) > 0) {
           cai_df <- cai_df %>%
             mutate(
               activity_segment = case_when(
-                is.na(cai) ~ "未知",
-                cai >= p67 ~ "漸趨活躍戶",
-                cai >= p33 ~ "穩定消費戶",
-                TRUE ~ "漸趨靜止戶"
+                is.na(cai_ecdf) ~ "未知",
+                cai_ecdf >= 0.8 ~ "漸趨活躍戶",  # P80 以上
+                cai_ecdf >= 0.2 ~ "穩定消費戶",  # P20-P80
+                TRUE ~ "漸趨靜止戶"               # P20 以下
               )
             )
 
@@ -187,7 +223,7 @@ customerActivityServer <- function(id, processed_data) {
             summarise(
               客戶數量 = n(),
               百分比 = sprintf("%.1f%%", n() / nrow(cai_df) * 100),
-              平均CAI值 = round(mean(cai, na.rm = TRUE), 2),
+              平均顧客活躍度 = round(mean(cai, na.rm = TRUE), 2),  # 改名：平均 CAI 值 → 平均顧客活躍度
               .groups = "drop"
             ) %>%
             mutate(
@@ -198,7 +234,7 @@ customerActivityServer <- function(id, processed_data) {
         }
       }, error = function(e) {
         showNotification(
-          paste("計算 CAI 時發生錯誤:", e$message),
+          paste("讀取 CAI 資料時發生錯誤:", e$message),
           type = "error",
           duration = 5
         )
@@ -300,7 +336,95 @@ customerActivityServer <- function(id, processed_data) {
     })
 
     # ==========================================================================
-    # 第三列：CAI 分布圖表
+    # 第三列：生命週期 × CAI 交叉矩陣 (Issue #2 Fix)
+    # ==========================================================================
+
+    output$lifecycle_cai_matrix <- renderPlotly({
+      req(values$cai_data)
+
+      # ✅ FIX Issue #2: Implement Lifecycle × CAI cross-tabulation heatmap
+      # Check if tag_017_customer_dynamics exists in the data
+      if (!"tag_017_customer_dynamics" %in% names(values$cai_data)) {
+        # Show error message if lifecycle data is missing
+        plot_ly() %>%
+          layout(
+            title = "錯誤：找不到生命週期資料（tag_017_customer_dynamics）",
+            xaxis = list(visible = FALSE),
+            yaxis = list(visible = FALSE)
+          )
+      } else {
+        # Create cross-tabulation: lifecycle (rows) × CAI activity segment (columns)
+        cross_tab_data <- values$cai_data %>%
+          group_by(tag_017_customer_dynamics, activity_segment) %>%
+          summarise(count = n(), .groups = "drop") %>%
+          tidyr::pivot_wider(
+            names_from = activity_segment,
+            values_from = count,
+            values_fill = 0
+          )
+
+        # Define lifecycle order (Chinese labels)
+        lifecycle_order <- c("新客", "主力客", "半睡客", "睡眠客", "沉睡客")
+
+        # Filter and arrange by lifecycle order
+        cross_tab_data <- cross_tab_data %>%
+          filter(tag_017_customer_dynamics %in% lifecycle_order) %>%
+          arrange(match(tag_017_customer_dynamics, lifecycle_order))
+
+        # Ensure all CAI activity segments exist (漸趨活躍戶, 穩定消費戶, 漸趨靜止戶)
+        activity_cols <- c("漸趨活躍戶", "穩定消費戶", "漸趨靜止戶")
+        for (col in activity_cols) {
+          if (!col %in% names(cross_tab_data)) {
+            cross_tab_data[[col]] <- 0
+          }
+        }
+
+        # Select and order columns
+        cross_tab_data <- cross_tab_data %>%
+          select(tag_017_customer_dynamics, all_of(activity_cols))
+
+        # Convert to matrix for heatmap (exclude lifecycle column)
+        matrix_data <- as.matrix(cross_tab_data[, -1])
+
+        # ✅ FIX: Use proper hovertemplate to show actual customer counts
+        plot_ly(
+          x = activity_cols,
+          y = cross_tab_data$tag_017_customer_dynamics,
+          z = matrix_data,
+          type = "heatmap",
+          colorscale = list(
+            c(0, "rgb(255, 255, 255)"),      # White for 0
+            c(0.3, "rgb(173, 216, 230)"),    # Light blue
+            c(0.6, "rgb(65, 105, 225)"),     # Medium blue
+            c(1, "rgb(25, 25, 112)")         # Dark blue
+          ),
+          # ✅ CRITICAL FIX: Use %{z} for actual values, not %{text}
+          hovertemplate = paste0(
+            "<b>生命週期：%{y}</b><br>",
+            "活躍度分群：%{x}<br>",
+            "客戶數：<b>%{z}</b><br>",
+            "<extra></extra>"
+          ),
+          showscale = TRUE,
+          colorbar = list(title = "客戶數")
+        ) %>%
+          layout(
+            xaxis = list(
+              title = "CAI 活躍度分群",
+              tickangle = 0
+            ),
+            yaxis = list(
+              title = "生命週期階段",
+              autorange = "reversed"  # Show 新客 at top
+            ),
+            title = "",
+            margin = list(l = 100, b = 100)
+          )
+      }
+    })
+
+    # ==========================================================================
+    # 第四列：CAI 分布圖表
     # ==========================================================================
 
     output$cai_distribution <- renderPlotly({
@@ -370,7 +494,7 @@ customerActivityServer <- function(id, processed_data) {
       # 格式化數值
       display_data <- display_data %>%
         mutate(
-          CAI係數 = round(CAI係數, 3),
+          CAI係數 = round(CAI係數, 2),  # 改為小數點後 2 位
           購買次數 = round(購買次數, 1),
           最近購買天數 = round(最近購買天數, 0),
           購買金額 = round(購買金額, 0)

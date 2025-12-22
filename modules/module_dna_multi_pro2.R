@@ -661,14 +661,15 @@ dnaMultiPro2ModuleServer <- function(id, con, user_info, uploaded_dna_data = NUL
           # 基本DNA分析作為fallback (使用正確的欄位名稱)
           dna_result <- sales_by_customer %>%
             mutate(
+              # ✅ 需求 #2: 使用 P20/P80 (80/20法則) 統一分群標準
               value_level = case_when(
-                m_value >= quantile(m_value, 0.67, na.rm = TRUE) ~ "高",
-                m_value >= quantile(m_value, 0.33, na.rm = TRUE) ~ "中",
+                m_value >= quantile(m_value, 0.80, na.rm = TRUE) ~ "高",
+                m_value >= quantile(m_value, 0.20, na.rm = TRUE) ~ "中",
                 TRUE ~ "低"
               ),
               activity_level = case_when(
-                f_value >= quantile(f_value, 0.67, na.rm = TRUE) ~ "高",
-                f_value >= quantile(f_value, 0.33, na.rm = TRUE) ~ "中",
+                f_value >= quantile(f_value, 0.80, na.rm = TRUE) ~ "高",
+                f_value >= quantile(f_value, 0.20, na.rm = TRUE) ~ "中",
                 TRUE ~ "低"
               ),
               lifecycle_stage = case_when(

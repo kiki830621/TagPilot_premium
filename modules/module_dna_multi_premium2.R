@@ -1007,14 +1007,15 @@ dnaMultiPremium2ModuleServer <- function(id, con, user_info, uploaded_dna_data =
           # 基本DNA分析作為fallback
           dna_result <- sales_by_customer %>%
             mutate(
+              # ✅ 需求 #2: 使用 P20/P80 (80/20法則) 統一分群標準
               value_level = case_when(
-                m_value >= quantile(m_value, 0.67, na.rm = TRUE) ~ "高",
-                m_value >= quantile(m_value, 0.33, na.rm = TRUE) ~ "中",
+                m_value >= quantile(m_value, 0.80, na.rm = TRUE) ~ "高",
+                m_value >= quantile(m_value, 0.20, na.rm = TRUE) ~ "中",
                 TRUE ~ "低"
               ),
               activity_level = case_when(
-                f_value >= quantile(f_value, 0.67, na.rm = TRUE) ~ "高",
-                f_value >= quantile(f_value, 0.33, na.rm = TRUE) ~ "中",
+                f_value >= quantile(f_value, 0.80, na.rm = TRUE) ~ "高",
+                f_value >= quantile(f_value, 0.20, na.rm = TRUE) ~ "中",
                 TRUE ~ "低"
               ),
               lifecycle_stage = case_when(
@@ -1663,8 +1664,12 @@ dnaMultiPremium2ModuleServer <- function(id, con, user_info, uploaded_dna_data =
       }
       if ("value_level" %in% available_cols) column_mapping[["價值等級"]] <- "value_level"
       if ("activity_level" %in% available_cols) column_mapping[["活躍等級"]] <- "activity_level"
-      if ("tv_combination" %in% available_cols) column_mapping[["T×V組合"]] <- "tv_combination"
-      if ("tv_combination_name" %in% available_cols) column_mapping[["TV組合名稱"]] <- "tv_combination_name"
+      # ✅ 修正：優先顯示完整名稱，而非代號
+      if ("tv_combination_name" %in% available_cols) {
+        column_mapping[["客戶類型標籤"]] <- "tv_combination_name"
+      } else if ("tv_combination" %in% available_cols) {
+        column_mapping[["T×V組合"]] <- "tv_combination"
+      }
       if ("ros_segment" %in% available_cols) column_mapping[["ROS分類"]] <- "ros_segment"
       if ("ros_description" %in% available_cols) column_mapping[["ROS描述"]] <- "ros_description"
       if ("m_value" %in% available_cols) column_mapping[["M值"]] <- "m_value"
@@ -1798,8 +1803,12 @@ dnaMultiPremium2ModuleServer <- function(id, con, user_info, uploaded_dna_data =
           }
           if ("value_level" %in% available_cols) column_mapping[["價值等級"]] <- "value_level"
           if ("activity_level" %in% available_cols) column_mapping[["活躍等級"]] <- "activity_level"
-          if ("tv_combination" %in% available_cols) column_mapping[["T×V組合"]] <- "tv_combination"
-          if ("tv_combination_name" %in% available_cols) column_mapping[["TV組合名稱"]] <- "tv_combination_name"
+          # ✅ 修正：CSV 也優先顯示完整名稱
+          if ("tv_combination_name" %in% available_cols) {
+            column_mapping[["客戶類型標籤"]] <- "tv_combination_name"
+          } else if ("tv_combination" %in% available_cols) {
+            column_mapping[["T×V組合"]] <- "tv_combination"
+          }
           if ("ros_segment" %in% available_cols) column_mapping[["ROS分類"]] <- "ros_segment"
           if ("ros_description" %in% available_cols) column_mapping[["ROS描述"]] <- "ros_description"
           if ("m_value" %in% available_cols) column_mapping[["M值"]] <- "m_value"
@@ -1825,17 +1834,26 @@ dnaMultiPremium2ModuleServer <- function(id, con, user_info, uploaded_dna_data =
                 across(any_of(c("穩定分數")), ~ round(as.numeric(.x), 3)),
                 across(any_of(c("總消費")), ~ round(as.numeric(.x), 2))
               )
-            
-            # 寫入CSV檔案
-            write.csv(download_data, file, row.names = FALSE, fileEncoding = "UTF-8")
+
+            # ✅ 修正：使用 UTF-8 BOM 確保 Excel 正確顯示中文
+            con <- file(file, open = "wb", encoding = "UTF-8")
+            writeBin(charToRaw('\ufeff'), con)  # UTF-8 BOM
+            write.csv(download_data, con, row.names = FALSE, fileEncoding = "UTF-8")
+            close(con)
             cat("Download completed: ", nrow(download_data), " rows, ", ncol(download_data), " columns\n")
           } else {
             # 如果沒有可用欄位，創建空檔案
-            write.csv(data.frame(訊息 = "無可下載的資料"), file, row.names = FALSE, fileEncoding = "UTF-8")
+            con <- file(file, open = "wb", encoding = "UTF-8")
+            writeBin(charToRaw('\ufeff'), con)
+            write.csv(data.frame(訊息 = "無可下載的資料"), con, row.names = FALSE, fileEncoding = "UTF-8")
+            close(con)
           }
         } else {
           # 如果沒有資料，創建空檔案
-          write.csv(data.frame(訊息 = "尚未進行分析，無資料可下載"), file, row.names = FALSE, fileEncoding = "UTF-8")
+          con <- file(file, open = "wb", encoding = "UTF-8")
+          writeBin(charToRaw('\ufeff'), con)
+          write.csv(data.frame(訊息 = "尚未進行分析，無資料可下載"), con, row.names = FALSE, fileEncoding = "UTF-8")
+          close(con)
         }
       }
     )

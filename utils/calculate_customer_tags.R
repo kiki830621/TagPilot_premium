@@ -166,12 +166,14 @@ calculate_status_tags <- function(customer_data) {
       ),
 
       # tag_019: 距離流失天數（預估）
-      # ✅ 修正：新客和交易次數不足者不計算
+      # ✅ Issue #3修正：使用 ipt 作為平均購買間隔（由 DNA 分析提供）
+      # 預估流失天數 = 2倍平均購買間隔 - 當前R值
       tag_019_days_to_churn = case_when(
         ni == 1 ~ NA_real_,  # 新客無法預測
-        ni < 4 ~ NA_real_,   # 交易次數不足，無法可靠預測
-        # 一般客戶：2倍購買週期 - 當前R值（負值設為0）
-        TRUE ~ pmax(0, ipt * 2 - r_value)
+        ni < 2 ~ NA_real_,   # 需至少2次購買才能計算間隔
+        is.na(ipt) | ipt <= 0 ~ NA_real_,  # ipt 無效
+        # 一般客戶：2倍平均購買間隔 - 當前R值（負值設為0）
+        TRUE ~ pmax(0, round(ipt * 2 - r_value, 0))
       )
     )
 }
@@ -207,8 +209,12 @@ calculate_prediction_tags <- function(customer_data, mu_ind = NULL) {
   customer_data %>%
     mutate(
       # tag_030: Next purchase amount prediction (using average order value)
-      # Use m_value directly (average per transaction) instead of referencing tag
-      tag_030_next_purchase_amount = m_value,
+      # ✅ 修正：應使用平均訂單金額（m_value / ni），而非總消費金額
+      tag_030_next_purchase_amount = case_when(
+        ni == 0 ~ NA_real_,  # 無交易記錄
+        is.na(m_value) ~ NA_real_,  # m_value 無效
+        TRUE ~ m_value / ni  # 平均訂單金額 = 總消費 / 購買次數
+      ),
 
       # tag_031: Next purchase date prediction (remaining time algorithm)
       # Step 1: Determine expected purchase cycle

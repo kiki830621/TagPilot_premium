@@ -28,10 +28,13 @@ customerValueAnalysisUI <- function(id) {
   div(
     h3("客戶價值分析 (RFM)", style = "text-align: center; margin: 20px 0;"),
 
-    # 狀態顯示
-    wellPanel(
-      h4("📊 分析狀態"),
-      verbatimTextOutput(ns("status"))
+    # 狀態顯示（僅錯誤時顯示）
+    conditionalPanel(
+      condition = paste0("output['", ns("has_error"), "'] == true"),
+      wellPanel(
+        h4("⚠️ 分析狀態"),
+        verbatimTextOutput(ns("status"))
+      )
     ),
 
     # 資料品質警告
@@ -89,7 +92,7 @@ customerValueAnalysisUI <- function(id) {
       fluidRow(
         column(3,
           bs4Card(
-            title = "平均 R 值（新近度）",
+            title = "顧客平均最近購買日",
             status = "danger",
             solidHeader = TRUE,
             width = 12,
@@ -101,7 +104,7 @@ customerValueAnalysisUI <- function(id) {
         ),
         column(3,
           bs4Card(
-            title = "平均 F 值（頻率）",
+            title = "顧客平均購買頻率",
             status = "warning",
             solidHeader = TRUE,
             width = 12,
@@ -113,7 +116,7 @@ customerValueAnalysisUI <- function(id) {
         ),
         column(3,
           bs4Card(
-            title = "平均 M 值（金額）",
+            title = "顧客平均購買金額",
             status = "success",
             solidHeader = TRUE,
             width = 12,
@@ -211,7 +214,7 @@ customerValueAnalysisUI <- function(id) {
       fluidRow(
         column(4,
           bs4Card(
-            title = "R 值分布（新近度）",
+            title = "顧客平均最近購買日分布",
             status = "primary",
             solidHeader = TRUE,
             width = 12,
@@ -220,7 +223,7 @@ customerValueAnalysisUI <- function(id) {
         ),
         column(4,
           bs4Card(
-            title = "F 值分布（頻率）",
+            title = "顧客平均購買頻率分布",
             status = "primary",
             solidHeader = TRUE,
             width = 12,
@@ -229,7 +232,7 @@ customerValueAnalysisUI <- function(id) {
         ),
         column(4,
           bs4Card(
-            title = "M 值分布（金額）",
+            title = "顧客平均購買金額分布",
             status = "primary",
             solidHeader = TRUE,
             width = 12,
@@ -265,7 +268,7 @@ customerValueAnalysisUI <- function(id) {
       fluidRow(
         column(12,
           bs4Card(
-            title = "RFM 熱力圖：購買金額 vs 頻率（氣泡大小 = 新近度）",
+            title = "RFM 熱力圖：購買金額 vs 頻率（氣泡大小 = 最近購買日）",
             status = "primary",
             solidHeader = TRUE,
             width = 12,
@@ -374,11 +377,8 @@ customerValueAnalysisServer <- function(id, customer_data) {
         }
 
         values$data_quality_issues <- issues
-        values$status_text <- sprintf(
-          "✅ 完成！分析 %d 位客戶的 RFM 價值\n• 有 RFM 總分的客戶：%d 位（交易次數 ≥ 4）",
-          nrow(processed),
-          sum(!is.na(processed$tag_012_rfm_score))
-        )
+        # 成功時不顯示訊息
+        values$status_text <- ""
 
       }, error = function(e) {
         values$status_text <- paste("❌ 錯誤:", e$message)
@@ -390,6 +390,12 @@ customerValueAnalysisServer <- function(id, customer_data) {
       !is.null(values$processed_data)
     })
     outputOptions(output, "data_ready", suspendWhenHidden = FALSE)
+
+    # 控制錯誤訊息顯示
+    output$has_error <- reactive({
+      !is.null(values$status_text) && values$status_text != "" && grepl("錯誤", values$status_text)
+    })
+    outputOptions(output, "has_error", suspendWhenHidden = FALSE)
 
     # 狀態輸出
     output$status <- renderText({
@@ -462,14 +468,28 @@ customerValueAnalysisServer <- function(id, customer_data) {
     # 中位購買週期 (Median Purchase Cycle)
     output$median_purchase_cycle <- renderText({
       req(values$processed_data)
-      # 購買週期 = 1 / F value (天/次)
-      # 先過濾掉 F = 0 或 NA 的客戶
-      f_values <- values$processed_data$tag_010_rfm_f[!is.na(values$processed_data$tag_010_rfm_f) & values$processed_data$tag_010_rfm_f > 0]
 
-      if (length(f_values) > 0) {
-        # 計算購買週期（天數）
-        purchase_cycles <- 1 / f_values
-        median_cycle <- median(purchase_cycles, na.rm = TRUE)
+      # ✅ 修正：優先使用 DNA 提供的 ipt_mean，否則從 ipt 和 ni 計算
+      if ("ipt_mean" %in% names(values$processed_data)) {
+        # 方法 1: 直接使用 ipt_mean（平均購買間隔）
+        ipt_values <- values$processed_data$ipt_mean[
+          !is.na(values$processed_data$ipt_mean) &
+          values$processed_data$ipt_mean > 0
+        ]
+      } else if ("ipt" %in% names(values$processed_data) &&
+                 "ni" %in% names(values$processed_data)) {
+        # 方法 2: 從 ipt（總時間跨度）和 ni（購買次數）計算
+        # 平均購買間隔 = 總時間跨度 / (購買次數 - 1)
+        ipt_values <- values$processed_data %>%
+          filter(ni >= 2, !is.na(ipt), ipt > 0) %>%
+          mutate(avg_ipt = ipt / (ni - 1)) %>%
+          pull(avg_ipt)
+      } else {
+        return("N/A")
+      }
+
+      if (length(ipt_values) > 0) {
+        median_cycle <- median(ipt_values, na.rm = TRUE)
 
         # 根據數值大小選擇合適的顯示格式
         if (median_cycle >= 365) {
@@ -536,16 +556,16 @@ customerValueAnalysisServer <- function(id, customer_data) {
       df <- values$processed_data %>%
         filter(!is.na(tag_009_rfm_r))
 
-      # 使用 P33/P67 切分以獲得更均勻的三組
-      p67 <- quantile(df$tag_009_rfm_r, 0.67, na.rm = TRUE)
-      p33 <- quantile(df$tag_009_rfm_r, 0.33, na.rm = TRUE)
+      # ✅ 需求 #2: 使用 P20/P80 (80/20法則) 統一分群標準
+      p80 <- quantile(df$tag_009_rfm_r, 0.80, na.rm = TRUE)
+      p20 <- quantile(df$tag_009_rfm_r, 0.20, na.rm = TRUE)
 
       df %>%
         mutate(
           r_segment = case_when(
-            tag_009_rfm_r <= p33 ~ "最近買家",
-            tag_009_rfm_r <= p67 ~ "中期買家",
-            TRUE ~ "長期未購者"
+            tag_009_rfm_r <= p20 ~ "最近買家",      # 底部 20%: 最近購買
+            tag_009_rfm_r <= p80 ~ "中期買家",      # 中間 60%
+            TRUE ~ "長期未購者"                     # 頂部 20%: 很久沒買
           )
         ) %>%
         group_by(r_segment) %>%
@@ -595,16 +615,16 @@ customerValueAnalysisServer <- function(id, customer_data) {
           ) %>%
           arrange(desc(f_segment))
       } else {
-        # 正常分布：使用P33/P67切分以獲得更均勻的三組
-        p67 <- quantile(df$tag_010_rfm_f, 0.67, na.rm = TRUE)
-        p33 <- quantile(df$tag_010_rfm_f, 0.33, na.rm = TRUE)
+        # ✅ 需求 #2: 使用 P20/P80 (80/20法則) 統一分群標準
+        p80 <- quantile(df$tag_010_rfm_f, 0.80, na.rm = TRUE)
+        p20 <- quantile(df$tag_010_rfm_f, 0.20, na.rm = TRUE)
 
         df %>%
           mutate(
             f_segment = case_when(
-              tag_010_rfm_f >= p67 ~ "高頻買家",
-              tag_010_rfm_f >= p33 ~ "中頻買家",
-              TRUE ~ "低頻買家"
+              tag_010_rfm_f >= p80 ~ "高頻買家",    # 頂部 20%: 購買頻率高
+              tag_010_rfm_f >= p20 ~ "中頻買家",    # 中間 60%
+              TRUE ~ "低頻買家"                     # 底部 20%: 購買頻率低
             )
           ) %>%
           group_by(f_segment) %>%
@@ -662,16 +682,16 @@ customerValueAnalysisServer <- function(id, customer_data) {
           ) %>%
           arrange(desc(m_segment))
       } else {
-        # 正常分布：使用P33/P67切分
-        p67 <- quantile(df$tag_011_rfm_m, 0.67, na.rm = TRUE)
-        p33 <- quantile(df$tag_011_rfm_m, 0.33, na.rm = TRUE)
+        # ✅ 需求 #2: 使用 P20/P80 (80/20法則) 統一分群標準
+        p80 <- quantile(df$tag_011_rfm_m, 0.80, na.rm = TRUE)
+        p20 <- quantile(df$tag_011_rfm_m, 0.20, na.rm = TRUE)
 
         df %>%
           mutate(
             m_segment = case_when(
-              tag_011_rfm_m >= p67 ~ "高消費買家",
-              tag_011_rfm_m >= p33 ~ "中消費買家",
-              TRUE ~ "低消費買家"
+              tag_011_rfm_m >= p80 ~ "高消費買家",    # 頂部 20%: 高消費
+              tag_011_rfm_m >= p20 ~ "中消費買家",    # 中間 60%
+              TRUE ~ "低消費買家"                     # 底部 20%: 低消費
             )
           ) %>%
           group_by(m_segment) %>%

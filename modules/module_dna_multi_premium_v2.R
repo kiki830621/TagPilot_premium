@@ -108,6 +108,7 @@ dnaMultiPremiumModuleUI <- function(id) {
             status = "primary",
             solidHeader = TRUE,
             width = 12,
+            footer = downloadButton(ns("download_customer_data"), "下載客戶資料 CSV", class = "btn-primary"),
             DTOutput(ns("customer_table"))
           )
         )
@@ -564,7 +565,8 @@ dnaMultiPremiumModuleServer <- function(id, con, user_info, dna_data_reactive) {
           message("[DEBUG] Step 17: Calculating grid_position...")
           customer_data <- customer_data %>%
             mutate(
-              grid_position = case_when(
+              # First calculate base grid position (A1-C3)
+              grid_base = case_when(
                 is.na(activity_level) ~ "無",  # ni < 4
                 value_level == "高" & activity_level == "高" ~ "A1",
                 value_level == "高" & activity_level == "中" ~ "A2",
@@ -576,8 +578,25 @@ dnaMultiPremiumModuleServer <- function(id, con, user_info, dna_data_reactive) {
                 value_level == "低" & activity_level == "中" ~ "C2",
                 value_level == "低" & activity_level == "低" ~ "C3",
                 TRUE ~ "其他"
+              ),
+              # Then add lifecycle suffix based on customer_dynamics
+              # Note: customer_dynamics from DNA analysis is in English
+              lifecycle_suffix = case_when(
+                customer_dynamics == "newbie" ~ "N",
+                customer_dynamics == "active" ~ "C",
+                customer_dynamics == "sleepy" ~ "S",
+                customer_dynamics == "half_sleepy" ~ "H",
+                customer_dynamics == "dormant" ~ "D",
+                TRUE ~ ""
+              ),
+              # Combine to create full grid_position (e.g., "A1C", "B2N")
+              grid_position = if_else(
+                grid_base == "無" | grid_base == "其他",
+                grid_base,
+                paste0(grid_base, lifecycle_suffix)
               )
-            )
+            ) %>%
+            select(-grid_base, -lifecycle_suffix)  # Remove temporary columns
           message("[DEBUG] ✓ Step 17: grid_position calculated")
         }, error = function(e) {
           message("[ERROR] Step 17 FAILED: Calculating grid_position - ", e$message)
@@ -1084,19 +1103,36 @@ dnaMultiPremiumModuleServer <- function(id, con, user_info, dna_data_reactive) {
         df <- df %>% filter(customer_dynamics == input$customer_dynamics)
       }
 
-      # Select columns to display
+      # ✅ FIX Issue #4: Add customer type labels and strategies
+      # Use get_strategy() to extract title (customer type) and action (strategy)
+      df <- df %>%
+        rowwise() %>%
+        mutate(
+          strategy_data = list(get_strategy(grid_position)),
+          customer_type = if(!is.null(strategy_data)) strategy_data$title else NA_character_,
+          strategy = if(!is.null(strategy_data)) strategy_data$action else NA_character_
+        ) %>%
+        ungroup() %>%
+        select(-strategy_data)
+
+      # ✅ FIX Issue #4: Chinese column names and add type/strategy columns
       display_df <- df %>%
         select(
-          customer_id,
-          customer_dynamics,  # Updated from lifecycle_stage
-          value_level,
-          activity_level,
-          grid_position,
-          ni,
-          r_value,
-          m_value,
-          # Note: aov column doesn't exist in DNA output, m_value is the monetary metric
-          any_of(c("z_i", "F_i_w", "ipt"))  # Include z-score and ipt columns if available
+          客戶ID = customer_id,
+          客戶類型標籤 = customer_type,           # NEW: Customer type label (e.g., "潛力新芽")
+          建議策略 = strategy,                    # NEW: Strategy recommendation
+          生命週期階段 = customer_dynamics,
+          價值等級 = value_level,
+          活躍度等級 = activity_level,
+          九宮格位置 = grid_position,
+          交易次數 = ni,
+          最近購買天數 = r_value,
+          購買金額 = m_value,
+          any_of(c(
+            "平均購買間隔" = "ipt",
+            "Z分數" = "z_i",
+            "加權頻率" = "F_i_w"
+          ))
         )
 
       datatable(
@@ -1104,12 +1140,71 @@ dnaMultiPremiumModuleServer <- function(id, con, user_info, dna_data_reactive) {
         options = list(
           pageLength = 25,
           scrollX = TRUE,
-          dom = 'Bfrtip',
-          buttons = c('copy', 'csv', 'excel')
+          dom = 'frtip'  # ✅ 移除 buttons，改用自訂下載按鈕
         ),
         rownames = FALSE
-      )
+      ) %>%
+        formatRound(c('最近購買天數', '購買金額'), digits = 1)
     })
+
+    # ============================================================================
+    # DOWNLOAD HANDLER - Customer Data CSV with UTF-8 BOM
+    # ============================================================================
+
+    output$download_customer_data <- downloadHandler(
+      filename = function() {
+        paste0("customer_data_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")
+      },
+      content = function(file) {
+        req(values$dna_results)
+
+        df <- values$dna_results$data_by_customer
+
+        # Get strategy data for each customer
+        df <- df %>%
+          rowwise() %>%
+          mutate(
+            strategy_data = list(get_strategy(grid_position)),
+            customer_type = if(!is.null(strategy_data)) strategy_data$title else NA_character_,
+            strategy = if(!is.null(strategy_data)) strategy_data$action else NA_character_
+          ) %>%
+          ungroup() %>%
+          select(-strategy_data)
+
+        # Prepare export data with Chinese column names
+        export_df <- df %>%
+          select(
+            客戶ID = customer_id,
+            客戶類型標籤 = customer_type,
+            建議策略 = strategy,
+            生命週期階段 = customer_dynamics,
+            價值等級 = value_level,
+            活躍度等級 = activity_level,
+            九宮格位置 = grid_position,
+            交易次數 = ni,
+            最近購買天數 = r_value,
+            購買金額 = m_value,
+            any_of(c(
+              "平均購買間隔" = "ipt",
+              "Z分數" = "z_i",
+              "加權頻率" = "F_i_w"
+            ))
+          )
+
+        # Format numeric columns
+        export_df <- export_df %>%
+          mutate(
+            最近購買天數 = round(最近購買天數, 1),
+            購買金額 = round(購買金額, 1)
+          )
+
+        # ✅ Write with UTF-8 BOM for Excel compatibility
+        con <- file(file, open = "wb", encoding = "UTF-8")
+        writeBin(charToRaw('\ufeff'), con)  # UTF-8 BOM
+        write.csv(export_df, con, row.names = FALSE, fileEncoding = "UTF-8")
+        close(con)
+      }
+    )
 
     # ============================================================================
     # RETURN REACTIVE DATA (Critical for downstream modules)
